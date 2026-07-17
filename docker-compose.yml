@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: timesheet_app
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - GIN_MODE=release
+      - TEMPLATE_PATH=templates/master_template.xlsx
+      - STATIC_FILES_PATH=./static
+    restart: always

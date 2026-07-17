@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: timesheet_backend_dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+      - /app/tmp # Exclude local rebuild binaries from dev mount
+    environment:
+      - PORT=8080
+      - GIN_MODE=debug
+      - GOTENBERG_URL=http://gotenberg:3000/forms/libreoffice/convert
+      - TEMPLATE_PATH=templates/master_template.xlsx
+    depends_on:
+      - gotenberg
+    networks:
+      - timesheet-network-dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: timesheet_frontend_dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8080
+      - PORT=3000
+    depends_on:
+      - backend
+    networks:
+      - timesheet-network-dev
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: timesheet_gotenberg_dev
+    expose:
+      - "3000"
+    networks:
+      - timesheet-network-dev
+
+networks:
+  timesheet-network-dev:
+    driver: bridge
