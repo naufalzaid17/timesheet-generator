@@ -1,0 +1,23 @@
+# Air configuration file for hot-reloading Go with Gin and Swagger docs
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  bin = "./tmp/main"
+  # Swag init is run automatically before build so Swagger UI is always updated
+  cmd = "swag init && go build -o ./tmp/main ."
+  delay = 1000
+  exclude_dir = ["assets", "tmp", "vendor", "docs"]
+  include_ext = ["go", "tpl", "html"]
+  exclude_regex = ["_test\\.go"]
+  log = "air.log"
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  clean_on_exit = true

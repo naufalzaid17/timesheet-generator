@@ -1,0 +1,19 @@
+FROM golang:1.21-alpine
+
+# Install git (required for swag) and swag CLI
+RUN apk update && apk add --no-cache git
+RUN go install github.com/swaggo/swag/cmd/swag@latest
+
+# Install Air for Go hot-reloading
+RUN go install github.com/cosmtrek/air@latest
+
+WORKDIR /app
+
+# Copy dependency files
+COPY go.mod ./
+RUN go mod download || true
+
+EXPOSE 8080
+
+# Run Air using the config file
+CMD ["air", "-c", ".air.toml"]
