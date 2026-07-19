@@ -169,17 +169,36 @@ func GenerateExcel(req *models.TimesheetRequest, holidayMap map[string]string) (
 
 	// Write signature blocks (A43, D43, G43 shifted up to finalRow)
 	finalRow := 12 + daysInMonth
-	if req.SignatureEmployee != "" {
-		_ = f.SetCellValue(sheetName, fmt.Sprintf("A%d", finalRow), req.SignatureEmployee)
-		_ = f.SetCellStyle(sheetName, fmt.Sprintf("A%d", finalRow), fmt.Sprintf("A%d", finalRow), headerStyle)
-	}
-	if req.SignatureReviewer != "" {
-		_ = f.SetCellValue(sheetName, fmt.Sprintf("D%d", finalRow), req.SignatureReviewer)
-		_ = f.SetCellStyle(sheetName, fmt.Sprintf("D%d", finalRow), fmt.Sprintf("D%d", finalRow), headerStyle)
-	}
-	if req.SignatureApprover != "" {
-		_ = f.SetCellValue(sheetName, fmt.Sprintf("G%d", finalRow), req.SignatureApprover)
-		_ = f.SetCellStyle(sheetName, fmt.Sprintf("G%d", finalRow), fmt.Sprintf("G%d", finalRow), headerStyle)
+	sigStyle, err := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Family: "Arial",
+			Size:   11,
+		},
+		Border: []excelize.Border{
+			{Type: "left", Color: "000000", Style: 1},
+			{Type: "top", Color: "000000", Style: 1},
+			{Type: "right", Color: "000000", Style: 1},
+			{Type: "bottom", Color: "000000", Style: 1},
+		},
+		Alignment: &excelize.Alignment{
+			Horizontal: "center",
+			Vertical:   "bottom",
+			WrapText:   true,
+		},
+	})
+	if err == nil {
+		if req.SignatureEmployee != "" {
+			_ = f.SetCellValue(sheetName, fmt.Sprintf("A%d", finalRow), req.SignatureEmployee)
+			_ = f.SetCellStyle(sheetName, fmt.Sprintf("A%d", finalRow), fmt.Sprintf("C%d", finalRow+3), sigStyle)
+		}
+		if req.SignatureReviewer != "" {
+			_ = f.SetCellValue(sheetName, fmt.Sprintf("D%d", finalRow), req.SignatureReviewer)
+			_ = f.SetCellStyle(sheetName, fmt.Sprintf("D%d", finalRow), fmt.Sprintf("F%d", finalRow+3), sigStyle)
+		}
+		if req.SignatureApprover != "" {
+			_ = f.SetCellValue(sheetName, fmt.Sprintf("G%d", finalRow), req.SignatureApprover)
+			_ = f.SetCellStyle(sheetName, fmt.Sprintf("G%d", finalRow), fmt.Sprintf("J%d", finalRow+3), sigStyle)
+		}
 	}
 
 	// 4. Define Excel styles
