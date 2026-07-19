@@ -26,6 +26,70 @@ func parseTimeToExcelFraction(timeStr string) (float64, error) {
 	return float64(h*60+m) / 1440.0, nil
 }
 
+// estimateCellLines estimates the number of wrapped lines for a text cell given a specific column width
+func estimateCellLines(text string, colWidth float64) int {
+	if text == "" {
+		return 1
+	}
+	// Proportional font adjustment factor: assume average character width is slightly larger than the grid units
+	effectiveWidth := int(colWidth * 0.95)
+	if effectiveWidth < 5 {
+		effectiveWidth = 5
+	}
+	lines := 0
+	segments := strings.Split(text, "\n")
+	for _, seg := range segments {
+		if len(seg) == 0 {
+			lines++
+			continue
+		}
+		segLines := (len(seg) + effectiveWidth - 1) / effectiveWidth
+		if segLines == 0 {
+			segLines = 1
+		}
+		lines += segLines
+	}
+	return lines
+}
+
+// calculateRowHeight calculates the dynamic height of a row based on text content and column widths
+func calculateRowHeight(activity, projectName, projectID, appImpacted, division, department string) float64 {
+	maxLines := 1
+
+	colWidths := map[string]float64{
+		"K": 62.2, // Activity
+		"L": 15.0, // Project Name
+		"M": 9.6,  // Project ID
+		"N": 18.2, // App Impacted
+		"P": 20.9, // Division
+		"Q": 12.8, // Department
+	}
+
+	if l := estimateCellLines(activity, colWidths["K"]); l > maxLines {
+		maxLines = l
+	}
+	if l := estimateCellLines(projectName, colWidths["L"]); l > maxLines {
+		maxLines = l
+	}
+	if l := estimateCellLines(projectID, colWidths["M"]); l > maxLines {
+		maxLines = l
+	}
+	if l := estimateCellLines(appImpacted, colWidths["N"]); l > maxLines {
+		maxLines = l
+	}
+	if l := estimateCellLines(division, colWidths["P"]); l > maxLines {
+		maxLines = l
+	}
+	if l := estimateCellLines(department, colWidths["Q"]); l > maxLines {
+		maxLines = l
+	}
+
+	if maxLines > 1 {
+		return 15.0 + float64(maxLines-1)*13.0
+	}
+	return 15.0
+}
+
 // GenerateExcel processes the master template and returns the filled spreadsheet as a byte array
 func GenerateExcel(req *models.TimesheetRequest, holidayMap map[string]string) ([]byte, error) {
 	// Open spreadsheet template
@@ -226,7 +290,7 @@ func GenerateExcel(req *models.TimesheetRequest, holidayMap map[string]string) (
 		},
 	})
 
-	// Active Left Style for Columns K-Q (Text columns) on working days
+	// Active Centered Style for Columns K-Q (Text columns) on working days
 	activeStyleLeft, _ := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{
 			Family: "Arial",
@@ -240,7 +304,7 @@ func GenerateExcel(req *models.TimesheetRequest, holidayMap map[string]string) (
 		},
 		Alignment: &excelize.Alignment{
 			Vertical:   "center",
-			Horizontal: "left",
+			Horizontal: "center",
 			WrapText:   true,
 		},
 	})
@@ -253,6 +317,7 @@ func GenerateExcel(req *models.TimesheetRequest, holidayMap map[string]string) (
 
 		dateStr := fmt.Sprintf("%04d-%02d-%02d", req.Year, req.Month, day)
 		holidayDesc, isHoliday := holidayMap[dateStr]
+		var h float64 = 15.0
 
 		if isWeekend || isHoliday {
 			// Apply soft gray background across all fillable columns (B to Q)
@@ -277,11 +342,13 @@ func GenerateExcel(req *models.TimesheetRequest, holidayMap map[string]string) (
 				for _, col := range []string{"L", "M", "N", "O", "P", "Q"} {
 					_ = f.SetCellValue(sheetName, fmt.Sprintf("%s%d", col, r), "")
 				}
+				h = calculateRowHeight(holidayDesc, "", "", "", "", "")
 			} else {
 				// Clear all text columns for weekend
 				for _, col := range []string{"K", "L", "M", "N", "O", "P", "Q"} {
 					_ = f.SetCellValue(sheetName, fmt.Sprintf("%s%d", col, r), "")
 				}
+				h = 15.0
 			}
 		} else {
 			// Working day: search for entry
@@ -350,6 +417,8 @@ func GenerateExcel(req *models.TimesheetRequest, holidayMap map[string]string) (
 				_ = f.SetCellValue(sheetName, fmt.Sprintf("O%d", r), "") // AIP Fitur
 				_ = f.SetCellValue(sheetName, fmt.Sprintf("P%d", r), entry.Division)
 				_ = f.SetCellValue(sheetName, fmt.Sprintf("Q%d", r), entry.Department)
+
+				h = calculateRowHeight(entry.Activity, entry.ProjectName, entry.ProjectID, entry.AppImpacted, entry.Division, entry.Department)
 			} else {
 				// Clear fields if no entry was found for this working day
 				_ = f.SetCellValue(sheetName, fmt.Sprintf("B%d", r), "")
@@ -357,6 +426,7 @@ func GenerateExcel(req *models.TimesheetRequest, holidayMap map[string]string) (
 				for _, col := range []string{"E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q"} {
 					_ = f.SetCellValue(sheetName, fmt.Sprintf("%s%d", col, r), "")
 				}
+				h = 15.0
 			}
 
 			// Format styles for working days
@@ -365,6 +435,8 @@ func GenerateExcel(req *models.TimesheetRequest, holidayMap map[string]string) (
 			_ = f.SetCellStyle(sheetName, fmt.Sprintf("E%d", r), fmt.Sprintf("J%d", r), activeStyleCenter)
 			_ = f.SetCellStyle(sheetName, fmt.Sprintf("K%d", r), fmt.Sprintf("Q%d", r), activeStyleLeft)
 		}
+
+		_ = f.SetRowHeight(sheetName, r, h)
 	}
 
 	// 6. Readability & Print Formatting
