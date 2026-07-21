@@ -109,10 +109,16 @@ Migrations and the bootstrap-admin seed run in `backend/database/database.go`.
 
 ## 7. Deployment
 
-- `docker-compose.yml`: PostgreSQL, pgAdmin (DBeaver can also attach on 5432),
-  Mailpit (SMTP + web UI on 8025), backend, frontend.
-- Multi-stage `Dockerfile` builds the static Next export and the Go binary into
-  one image (`STATIC_FILES_PATH` serves the frontend).
+- **Single unified image (production)**: the multi-stage root `Dockerfile`
+  builds the Next.js static export (`output: export`) and the Go binary into one
+  Alpine image. The Go server serves the API under `/api/*` **and** the exported
+  frontend from the same origin — a `NoRoute` SPA handler resolves routes to the
+  exported `login.html` / `dashboard.html` / … documents (with safe path
+  handling), so no separate web server or second container is needed.
+  `docker-compose.prod.yml` runs just this image + PostgreSQL.
+- **Dev stack** (`docker-compose.yml`): PostgreSQL, pgAdmin (DBeaver can also
+  attach on 5432), Mailpit (SMTP + web UI on 8025), and hot-reloading backend +
+  frontend as separate containers.
 - `deploy_and_commit.sh`: validates a Conventional Commit, commits + pushes,
   SSHes to `192.168.0.2:222`, **scans upward from port 2000** for a free port on
   the host, and brings the stack up there.

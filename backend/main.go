@@ -2,7 +2,10 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -48,14 +51,15 @@ func main() {
 
 	registerRoutes(r, srv)
 
-	// Optionally serve the exported Next.js frontend.
+	// Serve the exported Next.js frontend from this same binary so the whole
+	// portal ships as a single image (frontend + API on one origin).
 	staticPath := os.Getenv("STATIC_FILES_PATH")
 	if staticPath == "" {
 		staticPath = "./static"
 	}
 	if _, err := os.Stat(staticPath); err == nil {
-		r.Static("/_next", staticPath+"/_next")
-		r.StaticFile("/favicon.ico", staticPath+"/favicon.ico")
+		r.NoRoute(spaHandler(staticPath))
+		log.Printf("serving static frontend from %s", staticPath)
 	}
 
 	log.Printf("server starting on port %s", cfg.Port)
@@ -121,5 +125,55 @@ func registerRoutes(r *gin.Engine, s *handlers.Server) {
 		admin.POST("/templates", s.UploadTemplate)
 		admin.POST("/templates/:id/mappings", s.SaveTemplateMappings)
 		admin.DELETE("/templates/:id", s.DeleteTemplate)
+	}
+}
+
+// spaHandler serves the statically-exported Next.js site (Next `output: export`)
+// from the Go binary. It resolves a request path to an on-disk file, trying the
+// exact file, then "<path>.html" (Next exports routes like /login -> login.html),
+// then "<path>/index.html", and finally falls back to the root index.html so
+// client-side routing still works. Unmatched /api/* paths return a JSON 404
+// rather than HTML.
+func spaHandler(staticRoot string) gin.HandlerFunc {
+	root := filepath.Clean(staticRoot)
+
+	// tryFiles returns the first existing, non-directory candidate.
+	tryFiles := func(candidates ...string) (string, bool) {
+		for _, c := range candidates {
+			if info, err := os.Stat(c); err == nil && !info.IsDir() {
+				return c, true
+			}
+		}
+		return "", false
+	}
+
+	return func(c *gin.Context) {
+		// Never serve HTML for an unmatched API route.
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+
+		// filepath.Clean on a "/"-prefixed path strips any "../" traversal; the
+		// subsequent prefix check is defence-in-depth against escaping the root.
+		rel := filepath.Clean("/" + c.Request.URL.Path)
+		target := filepath.Join(root, filepath.FromSlash(rel))
+		if target != root && !strings.HasPrefix(target, root+string(os.PathSeparator)) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+
+		if file, ok := tryFiles(target, target+".html", filepath.Join(target, "index.html")); ok {
+			c.File(file)
+			return
+		}
+
+		// SPA fallback: hand back the root document and let the client router
+		// resolve the route (or render its own 404).
+		if index, ok := tryFiles(filepath.Join(root, "index.html")); ok {
+			c.File(index)
+			return
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 	}
 }
