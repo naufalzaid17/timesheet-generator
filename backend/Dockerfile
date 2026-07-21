@@ -1,35 +1,29 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
-# Install git and swag (required for Swagger docs generation)
 RUN apk update && apk add --no-cache git
-RUN go install github.com/swaggo/swag/cmd/swag@latest
 
 WORKDIR /app
 
-# Download dependencies
+# Download dependencies.
 COPY go.mod go.sum* ./
 RUN go mod download || true
 
-# Copy source code and templates
+# Copy source code and templates.
 COPY . .
 
-# Run swag init to build backend docs automatically
-RUN swag init
-
-# Build Go binary statically
+# Build Go binary statically.
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o main .
 
-# Runtime Stage
+# Runtime stage.
 FROM alpine:latest
 
+# ca-certificates for outbound TLS, tzdata so Asia/Jakarta resolves for the cron.
 RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /app
 
-# Copy binary and template directory
 COPY --from=builder /app/main .
 COPY --from=builder /app/templates ./templates
-COPY --from=builder /app/docs ./docs
 
 EXPOSE 8080
 

@@ -1,0 +1,357 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import {
+  Plus,
+  Download,
+  Bell,
+  BellRing,
+  Fingerprint,
+  Loader2,
+  CalendarRange,
+} from "lucide-react";
+import { api, downloadFile } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { useToast } from "@/components/Toast";
+import { enablePush, pushSupported, registerServiceWorker } from "@/lib/push";
+import { registerPasskey, passkeysSupported } from "@/lib/webauthn";
+import DailyModal from "@/components/DailyModal";
+import type { DailyActivity, Template } from "@/lib/types";
+
+const HotGrid = dynamic(() => import("@/components/HotGrid"), { ssr: false });
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// Columns shown in the monthly grid. `fillableFields` (from the default
+// template mapping) decides which of these the user may actually edit.
+const GRID_COLUMNS: { key: keyof DailyActivity; label: string; field: string }[] = [
+  { key: "start_time", label: "Time In", field: "time_in" },
+  { key: "end_time", label: "Time Out", field: "time_out" },
+  { key: "status", label: "Status", field: "status" },
+  { key: "activity", label: "Activity", field: "activity" },
+  { key: "project_name", label: "Project", field: "project_name" },
+  { key: "project_id", label: "Project ID", field: "project_id" },
+  { key: "app_impacted", label: "App Impacted", field: "app_impacted" },
+];
+
+function daysInMonth(year: number, month: number) {
+  return new Date(year, month, 0).getDate();
+}
+
+export default function DashboardPage() {
+  const { user } = useAuth();
+  const { notify } = useToast();
+
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1); // 1-based
+  const [activities, setActivities] = useState<DailyActivity[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushOn, setPushOn] = useState(false);
+
+  // Fillable fields come from the default template's mapping.
+  const fillableFields = useMemo(() => {
+    const def = templates.find((t) => t.is_default) || templates[0];
+    if (!def) return new Set(GRID_COLUMNS.map((c) => c.field)); // permissive fallback
+    const set = new Set<string>();
+    def.cell_mappings?.forEach((m) => {
+      if (m.scope === "daily_column" && m.fillable) set.add(m.field);
+    });
+    return set;
+  }, [templates]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [acts, tmpls] = await Promise.all([
+        api<DailyActivity[]>(`/api/activities?year=${year}&month=${month}`),
+        api<Template[]>("/api/templates").catch(() => []),
+      ]);
+      setActivities(acts || []);
+      setTemplates(tmpls || []);
+    } catch (err: any) {
+      notify(err.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [year, month, notify]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Register the service worker on mount and reflect current permission state.
+  useEffect(() => {
+    if (pushSupported()) {
+      registerServiceWorker().catch(() => {});
+      setPushOn(Notification.permission === "granted");
+    }
+  }, []);
+
+  // Build a day-indexed grid: one row per calendar day.
+  const totalDays = daysInMonth(year, month);
+  const byDay = useMemo(() => {
+    const map = new Map<number, DailyActivity>();
+    activities.forEach((a) => {
+      const d = new Date(a.date).getDate();
+      map.set(d, a);
+    });
+    return map;
+  }, [activities]);
+
+  const gridData = useMemo(() => {
+    const rows: any[][] = [];
+    for (let day = 1; day <= totalDays; day++) {
+      const act = byDay.get(day);
+      rows.push([
+        `${MONTHS[month - 1].slice(0, 3)} ${day}`,
+        ...GRID_COLUMNS.map((c) => (act ? (act[c.key] as string) || "" : "")),
+      ]);
+    }
+    return rows;
+  }, [totalDays, byDay, month]);
+
+  const colHeaders = useMemo(
+    () => ["Day", ...GRID_COLUMNS.map((c) => c.label)],
+    []
+  );
+
+  // Only mapped-fillable columns are editable; the Day column is always locked.
+  const cells = useCallback(
+    (_row: number, col: number) => {
+      if (col === 0) return { readOnly: true, className: "ht-day-col" };
+      const column = GRID_COLUMNS[col - 1];
+      const editable = fillableFields.size === 0 || fillableFields.has(column.field);
+      return { readOnly: !editable, className: editable ? "" : "ht-locked" };
+    },
+    [fillableFields]
+  );
+
+  // Persist grid edits back to the backend (upsert per day).
+  const onAfterChange = useCallback(
+    async (changes: any, source: string) => {
+      if (source === "loadData" || !changes) return;
+      const affectedDays = new Set<number>();
+      changes.forEach(([rowIndex]: [number]) => affectedDays.add(rowIndex + 1));
+
+      for (const day of Array.from(affectedDays)) {
+        const rowIndex = day - 1;
+        const row = gridData[rowIndex];
+        if (!row) continue;
+        const payload: DailyActivity = {
+          date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+          start_time: row[1] || "",
+          end_time: row[2] || "",
+          status: row[3] || "",
+          activity: row[4] || "",
+          project_name: row[5] || "",
+          project_id: row[6] || "",
+          app_impacted: row[7] || "",
+        };
+        try {
+          await api("/api/activities", { method: "POST", body: JSON.stringify(payload) });
+        } catch (err: any) {
+          notify(err.message, "error");
+        }
+      }
+    },
+    [gridData, year, month, notify]
+  );
+
+  const generate = async () => {
+    setGenerating(true);
+    try {
+      const def = templates.find((t) => t.is_default) || templates[0];
+      await downloadFile(
+        "/api/timesheet/generate",
+        { template_id: def?.id || 0, month, year },
+        `Timesheet_${month}_${year}.xlsx`
+      );
+      notify("Timesheet downloaded & emailed to you 📧", "success");
+    } catch (err: any) {
+      notify(err.message || "Generation failed", "error");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleEnablePush = async () => {
+    setPushBusy(true);
+    try {
+      await enablePush();
+      setPushOn(true);
+      notify("Daily reminders enabled at 17:00 WIB 🔔", "success");
+    } catch (err: any) {
+      notify(err.message || "Could not enable push", "error");
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const handleAddPasskey = async () => {
+    try {
+      await registerPasskey(`${user?.username}'s device`);
+      notify("Passkey registered — you can now sign in without a password.", "success");
+    } catch (err: any) {
+      notify(err.message || "Passkey registration failed", "error");
+    }
+  };
+
+  const filledCount = activities.length;
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Greeting hero */}
+      <div className="card overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-saweria-purple to-saweria-purpleDark p-6 text-white">
+          <div>
+            <p className="text-sm opacity-80">Halo,</p>
+            <h1 className="text-2xl font-extrabold">{user?.name || user?.username} 👋</h1>
+            <p className="mt-1 text-sm opacity-80">
+              {filledCount} day{filledCount === 1 ? "" : "s"} filled this month.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowModal(true)}
+            className="btn bg-saweria-yellow text-saweria-ink hover:bg-saweria-amber"
+          >
+            <Plus size={18} /> Today&apos;s Activity
+          </button>
+        </div>
+      </div>
+
+      {/* Action row */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <button
+          onClick={() => setShowModal(true)}
+          className="card flex items-center gap-3 p-4 text-left transition hover:shadow-lift"
+        >
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-saweria-yellow">
+            <Plus size={18} />
+          </div>
+          <div>
+            <p className="text-sm font-bold">Daily entry</p>
+            <p className="text-xs text-saweria-slate">Add today or a past date</p>
+          </div>
+        </button>
+
+        <button
+          onClick={generate}
+          disabled={generating}
+          className="card flex items-center gap-3 p-4 text-left transition hover:shadow-lift"
+        >
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-saweria-mint/15 text-saweria-mint">
+            {generating ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+          </div>
+          <div>
+            <p className="text-sm font-bold">Generate</p>
+            <p className="text-xs text-saweria-slate">Download & email .xlsx</p>
+          </div>
+        </button>
+
+        <button
+          onClick={handleEnablePush}
+          disabled={pushBusy || !pushSupported()}
+          className="card flex items-center gap-3 p-4 text-left transition hover:shadow-lift disabled:opacity-60"
+        >
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-saweria-purple/10 text-saweria-purple">
+            {pushBusy ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : pushOn ? (
+              <BellRing size={18} />
+            ) : (
+              <Bell size={18} />
+            )}
+          </div>
+          <div>
+            <p className="text-sm font-bold">{pushOn ? "Reminders on" : "Enable reminders"}</p>
+            <p className="text-xs text-saweria-slate">Daily push at 17:00 WIB</p>
+          </div>
+        </button>
+
+        <button
+          onClick={handleAddPasskey}
+          disabled={!passkeysSupported()}
+          className="card flex items-center gap-3 p-4 text-left transition hover:shadow-lift disabled:opacity-60"
+        >
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-saweria-coral/15 text-saweria-coral">
+            <Fingerprint size={18} />
+          </div>
+          <div>
+            <p className="text-sm font-bold">Add passkey</p>
+            <p className="text-xs text-saweria-slate">Passwordless sign-in</p>
+          </div>
+        </button>
+      </div>
+
+      {/* Month selector + grid */}
+      <div className="card p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <CalendarRange size={18} className="text-saweria-purple" />
+            <h2 className="text-lg font-bold">Monthly timesheet</h2>
+          </div>
+          <div className="flex gap-2">
+            <select
+              className="input w-auto"
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+            >
+              {MONTHS.map((m, i) => (
+                <option key={m} value={i + 1}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input w-auto"
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+            >
+              {[year - 1, year, year + 1].map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {fillableFields.size === 0 && templates.length > 0 && (
+          <p className="mb-3 rounded-2xl bg-saweria-yellow/20 px-4 py-2 text-sm text-saweria-ink">
+            No fillable columns are configured yet — ask an admin to map the template.
+          </p>
+        )}
+
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="animate-spin text-saweria-purple" />
+          </div>
+        ) : (
+          <HotGrid
+            data={gridData}
+            colHeaders={colHeaders}
+            cells={cells}
+            afterChange={onAfterChange}
+            height={480}
+          />
+        )}
+        <p className="mt-3 text-xs text-saweria-slate">
+          Only columns your admin marked as fillable are editable. Edits save automatically.
+        </p>
+      </div>
+
+      {showModal && (
+        <DailyModal onClose={() => setShowModal(false)} onSaved={load} />
+      )}
+    </div>
+  );
+}

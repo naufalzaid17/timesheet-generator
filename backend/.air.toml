@@ -5,8 +5,7 @@ tmp_dir = "tmp"
 
 [build]
   bin = "./tmp/main"
-  # Swag init is run automatically before build so Swagger UI is always updated
-  cmd = "swag init && go build -o ./tmp/main ."
+  cmd = "go build -o ./tmp/main ."
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor", "docs"]
   include_ext = ["go", "tpl", "html"]

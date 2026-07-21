@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Syne:wght@700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,33 +6,62 @@
 
 @layer base {
   body {
-    background-color: #FFFDE7;
-    font-family: 'Space Grotesk', sans-serif;
-    /* Dotted background pattern for premium Neobrutalism aesthetics */
-    background-image: radial-gradient(#000000 1.5px, transparent 1.5px);
-    background-size: 24px 24px;
-    background-color: #FFFDE7; /* Retro soft yellow page background */
-    color: #000000;
+    background-color: #F8FAFC;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    color: #1E1B4B;
+    /* Subtle soft-white surface with a faint warm wash near the top. */
+    background-image: radial-gradient(120% 60% at 50% -10%, rgba(255, 199, 0, 0.12), transparent 60%);
+    background-attachment: fixed;
+    min-height: 100vh;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Syne', sans-serif;
     font-weight: 800;
+    letter-spacing: -0.01em;
   }
 }
 
-/* Custom scrollbars matching the Neobrutalist design */
-::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+@layer components {
+  /* Friendly card surface used across the portal. */
+  .card {
+    @apply rounded-2xl bg-white border border-slate-100 shadow-soft;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-2.5 font-semibold transition-all duration-150 active:scale-[0.98];
+  }
+
+  .btn-primary {
+    @apply btn bg-saweria-purple text-white hover:bg-saweria-purpleDark shadow-soft;
+  }
+
+  .btn-accent {
+    @apply btn bg-saweria-yellow text-saweria-ink hover:bg-saweria-amber;
+  }
+
+  .btn-ghost {
+    @apply btn bg-slate-100 text-saweria-ink hover:bg-slate-200;
+  }
+
+  .input {
+    @apply w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-saweria-purple focus:ring-2 focus:ring-saweria-purple/20;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold;
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: #FFFDE7;
-  border-left: 3px solid #000000;
-}
+/* Handsontable theming to match the Saweria look. */
+.ht-mapped-cell { background-color: rgba(108, 92, 231, 0.18) !important; font-weight: 600; }
+.ht-mapped-col { background-color: rgba(255, 199, 0, 0.22) !important; }
+.ht-day-col { background-color: #F1F5F9 !important; font-weight: 600; }
+.ht-locked { background-color: #F8FAFC !important; color: #94A3B8 !important; }
+.handsontable { font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important; }
+.handsontable th { background-color: #F1F5F9 !important; font-weight: 700; }
 
-::-webkit-scrollbar-thumb {
-  background-color: #FF6B6B;
-  border: 3px solid #000000;
-}
+/* Rounded, friendly scrollbars. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background-color: #C7D2FE; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background-color: #6C5CE7; }

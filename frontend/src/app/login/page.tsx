@@ -1,0 +1,180 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { CalendarCheck, KeyRound, Fingerprint, Loader2 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { useToast } from "@/components/Toast";
+import { loginWithPasskey, passkeysSupported } from "@/lib/webauthn";
+import { api, getToken } from "@/lib/api";
+
+// The sole entry point to the portal. There is NO public sign-up — accounts are
+// created by admins. This page offers password login, passkey login, and the
+// forgot-password flow.
+export default function LoginPage() {
+  const { loginWithPassword, loginWithToken } = useAuth();
+  const { notify } = useToast();
+  const router = useRouter();
+
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+
+  const routeForRole = (role: string) =>
+    router.replace(role === "admin" ? "/users" : "/dashboard");
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const user = await loginWithPassword(identifier, password);
+      notify(`Welcome back, ${user.name || user.username}!`, "success");
+      routeForRole(user.role);
+    } catch (err: any) {
+      notify(err.message || "Login failed", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePasskeyLogin = async () => {
+    if (!identifier) {
+      notify("Enter your username or email first", "info");
+      return;
+    }
+    setBusy(true);
+    try {
+      const user = await loginWithPasskey(identifier);
+      // loginWithPasskey already persisted the JWT; sync the auth context user.
+      loginWithToken(getToken() || "", user);
+      notify("Signed in with passkey", "success");
+      routeForRole(user.role);
+    } catch (err: any) {
+      notify(err.message || "Passkey login failed", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api("/api/auth/forgot-password", {
+        method: "POST",
+        auth: false,
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+      notify("If that email exists, a reset link is on its way.", "success");
+      setShowForgot(false);
+    } catch (err: any) {
+      notify(err.message || "Request failed", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div className="mb-3 grid h-16 w-16 place-items-center rounded-3xl bg-saweria-yellow shadow-pop">
+            <CalendarCheck size={30} className="text-saweria-ink" />
+          </div>
+          <h1 className="text-2xl font-extrabold">Timesheet Portal</h1>
+          <p className="mt-1 text-sm text-saweria-slate">
+            Sign in to fill today&apos;s activity ✨
+          </p>
+        </div>
+
+        <div className="card p-6">
+          {!showForgot ? (
+            <form onSubmit={handlePasswordLogin} className="flex flex-col gap-4">
+              <div>
+                <label className="mb-1 block text-sm font-semibold">Username or Email</label>
+                <input
+                  className="input"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="you@company.com"
+                  autoComplete="username"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold">Password</label>
+                <input
+                  className="input"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+
+              <button type="submit" className="btn-primary w-full" disabled={busy}>
+                {busy ? <Loader2 size={18} className="animate-spin" /> : <KeyRound size={18} />}
+                Sign in
+              </button>
+
+              {passkeysSupported() && (
+                <button
+                  type="button"
+                  onClick={handlePasskeyLogin}
+                  className="btn-accent w-full"
+                  disabled={busy}
+                >
+                  <Fingerprint size={18} /> Sign in with passkey
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowForgot(true)}
+                className="text-center text-sm font-semibold text-saweria-purple hover:underline"
+              >
+                Forgot your password?
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleForgot} className="flex flex-col gap-4">
+              <div>
+                <label className="mb-1 block text-sm font-semibold">Email</label>
+                <input
+                  className="input"
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  required
+                />
+                <p className="mt-2 text-xs text-saweria-slate">
+                  We&apos;ll email you a link to reset your password.
+                </p>
+              </div>
+              <button type="submit" className="btn-primary w-full" disabled={busy}>
+                {busy ? <Loader2 size={18} className="animate-spin" /> : null}
+                Send reset link
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowForgot(false)}
+                className="text-center text-sm font-semibold text-saweria-purple hover:underline"
+              >
+                Back to sign in
+              </button>
+            </form>
+          )}
+        </div>
+
+        <p className="mt-4 text-center text-xs text-saweria-slate">
+          Accounts are provisioned by administrators. Contact your admin for access.
+        </p>
+      </div>
+    </div>
+  );
+}

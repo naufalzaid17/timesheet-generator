@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth";
+import { ToastProvider } from "@/components/Toast";
 
 export const metadata: Metadata = {
-  title: "BRUTAL TIMESHEET | Automate Your Timesheets",
-  description: "Automate your monthly BNI timesheets into Excel or PDF format in seconds. Clean, fast, and structured.",
+  title: "Timesheet Portal",
+  description: "Friendly internal portal for daily timesheet entry, dynamic templates, and reminders.",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -13,8 +16,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen">
-        {children}
+      <body className="min-h-screen antialiased">
+        <AuthProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );
