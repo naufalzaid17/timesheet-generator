@@ -1,9 +1,12 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -69,7 +72,7 @@ func Load() *Config {
 		Port:        getEnv("PORT", "8080"),
 		DatabaseURL: getEnv("DATABASE_URL", "host=localhost user=timesheet password=timesheet dbname=timesheet port=5432 sslmode=disable TimeZone=Asia/Jakarta"),
 
-		JWTSecret:     getEnv("JWT_SECRET", "dev-insecure-change-me"),
+		JWTSecret:     getEnv("JWT_SECRET", ""),
 		JWTExpiry:     time.Duration(getEnvInt("JWT_EXPIRY_HOURS", 24)) * time.Hour,
 		ResetTokenTTL: time.Duration(getEnvInt("RESET_TOKEN_TTL_MINUTES", 60)) * time.Minute,
 
@@ -92,11 +95,49 @@ func Load() *Config {
 
 		AdminEmail:    getEnv("BOOTSTRAP_ADMIN_EMAIL", "admin@timesheet.local"),
 		AdminUsername: getEnv("BOOTSTRAP_ADMIN_USERNAME", "admin"),
-		AdminPassword: getEnv("BOOTSTRAP_ADMIN_PASSWORD", "ChangeMe123!"),
+		AdminPassword: getEnv("BOOTSTRAP_ADMIN_PASSWORD", ""),
 	}
 
-	if cfg.JWTSecret == "dev-insecure-change-me" {
-		log.Println("[config] WARNING: using insecure default JWT secret; set JWT_SECRET in production")
-	}
+	cfg.validateSecrets()
 	return cfg
+}
+
+// isRelease reports whether the process is running in Gin's release mode.
+func isRelease() bool {
+	return strings.EqualFold(os.Getenv("GIN_MODE"), "release")
+}
+
+// knownWeakSecrets are values that must never be accepted as a signing key,
+// including secrets previously shipped as defaults in this repo.
+var knownWeakSecrets = map[string]bool{
+	"":                                  true,
+	"dev-insecure-change-me":            true,
+	"dev-secret-change-me":              true,
+	"change-me-to-a-long-random-string": true,
+	"changeme":                          true,
+	"secret":                            true,
+}
+
+// validateSecrets fails closed on a missing or well-known JWT secret in
+// production. In development it substitutes a random ephemeral secret so local
+// runs still work without shipping a guessable signing key. (The bootstrap
+// admin password is handled at seed time, where a random one is generated and
+// logged when unset.)
+func (c *Config) validateSecrets() {
+	if knownWeakSecrets[c.JWTSecret] {
+		if isRelease() {
+			log.Fatal("[config] JWT_SECRET must be set to a strong, non-default value when GIN_MODE=release")
+		}
+		c.JWTSecret = randomSecret(32)
+		log.Println("[config] JWT_SECRET unset or weak; generated an ephemeral development secret (all tokens invalidate on restart)")
+	}
+}
+
+// randomSecret returns a hex-encoded cryptographically random string.
+func randomSecret(nBytes int) string {
+	b := make([]byte, nBytes)
+	if _, err := rand.Read(b); err != nil {
+		log.Fatalf("[config] failed to generate random secret: %v", err)
+	}
+	return hex.EncodeToString(b)
 }

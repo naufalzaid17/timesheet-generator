@@ -30,8 +30,12 @@ Phase 2 turns the generator into a full internal portal. See
   friendly micro-interactions (replacing the Phase 1 Neobrutalism look).
 
 **Local stack** (`docker compose up --build`): PostgreSQL, pgAdmin (`:5050`),
-Mailpit (`:8025`), Go API (`:8080`), Next.js (`:3000`). Default admin:
-`admin` / `ChangeMe123!`.
+Mailpit (`:8025`), Go API (`:8080`), Next.js (`:3000`). On first boot the
+bootstrap admin (`admin`) is created with a **random password printed to the
+backend logs** — grab it from `docker compose logs backend` and change it after
+signing in, or set `BOOTSTRAP_ADMIN_PASSWORD` to choose your own. In production
+(`GIN_MODE=release`) the API refuses to start unless a strong `JWT_SECRET` is
+set.
 
 ---
 

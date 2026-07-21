@@ -1,6 +1,8 @@
 package database
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"log"
 
 	"golang.org/x/crypto/bcrypt"
@@ -58,7 +60,17 @@ func seedAdmin(db *gorm.DB, cfg *config.Config) error {
 		return nil
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(cfg.AdminPassword), bcrypt.DefaultCost)
+	// Never seed a known/guessable admin password. When BOOTSTRAP_ADMIN_PASSWORD
+	// is not explicitly provided, generate a strong random one and print it once
+	// so an operator can capture it from the logs and rotate it.
+	adminPassword := cfg.AdminPassword
+	generated := false
+	if adminPassword == "" {
+		adminPassword = randomPassword(18)
+		generated = true
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
@@ -73,6 +85,21 @@ func seedAdmin(db *gorm.DB, cfg *config.Config) error {
 	if err := db.Create(&admin).Error; err != nil {
 		return err
 	}
-	log.Printf("[database] seeded bootstrap admin '%s' (%s)", cfg.AdminUsername, cfg.AdminEmail)
+	if generated {
+		log.Printf("[database] seeded bootstrap admin '%s' (%s) with a GENERATED password: %s", cfg.AdminUsername, cfg.AdminEmail, adminPassword)
+		log.Printf("[database] ^ capture this now and change it after first login; it will not be shown again")
+	} else {
+		log.Printf("[database] seeded bootstrap admin '%s' (%s) using BOOTSTRAP_ADMIN_PASSWORD", cfg.AdminUsername, cfg.AdminEmail)
+	}
 	return nil
+}
+
+// randomPassword returns a URL-safe, cryptographically random password.
+func randomPassword(nBytes int) string {
+	b := make([]byte, nBytes)
+	if _, err := rand.Read(b); err != nil {
+		// Fall back is unacceptable for a credential; abort startup instead.
+		log.Fatalf("[database] failed to generate admin password: %v", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
 }

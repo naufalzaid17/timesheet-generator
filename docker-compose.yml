@@ -67,7 +67,9 @@ services:
       PORT: "8080"
       GIN_MODE: debug
       DATABASE_URL: "host=postgres user=timesheet password=timesheet dbname=timesheet port=5432 sslmode=disable TimeZone=Asia/Jakarta"
-      JWT_SECRET: "dev-secret-change-me"
+      # JWT_SECRET intentionally unset: in debug mode the backend generates an
+      # ephemeral secret at boot. Set a strong value here (or via .env) to keep
+      # sessions valid across restarts.
       SCHEDULER_TZ: "Asia/Jakarta"
       # SMTP -> Mailpit
       SMTP_HOST: mailpit
@@ -83,10 +85,11 @@ services:
       VAPID_PUBLIC_KEY: ""
       VAPID_PRIVATE_KEY: ""
       VAPID_SUBJECT: "mailto:admin@timesheet.local"
-      # Bootstrap admin (created once on first boot)
+      # Bootstrap admin (created once on first boot). Leave the password unset to
+      # have a strong random one generated and printed to the backend logs on
+      # first boot; set BOOTSTRAP_ADMIN_PASSWORD to choose your own.
       BOOTSTRAP_ADMIN_EMAIL: "admin@timesheet.local"
       BOOTSTRAP_ADMIN_USERNAME: "admin"
-      BOOTSTRAP_ADMIN_PASSWORD: "ChangeMe123!"
     depends_on:
       postgres:
         condition: service_healthy
