@@ -261,10 +261,14 @@ func (s *Server) FinishPasskeyLogin(c *gin.Context) {
 		return
 	}
 
-	// Persist the updated signature counter for clone detection.
+	// Persist the updated signature counter (clone detection) and backup state,
+	// which the spec allows to change over the credential's lifetime.
 	s.DB.Model(&models.WebAuthnCredential{}).
 		Where("credential_id = ?", credential.ID).
-		Update("sign_count", credential.Authenticator.SignCount)
+		Updates(map[string]interface{}{
+			"sign_count":   credential.Authenticator.SignCount,
+			"backup_state": credential.Flags.BackupState,
+		})
 
 	token, err := s.Auth.GenerateToken(&user)
 	if err != nil {

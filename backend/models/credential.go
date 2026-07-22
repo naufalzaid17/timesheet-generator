@@ -25,6 +25,12 @@ func (c WebAuthnCredential) ToLibrary() (webauthn.Credential, error) {
 		PublicKey:       c.PublicKey,
 		AttestationType: c.AttestationType,
 		Transport:       transports,
+		// Restore the backup flags so the library's login-time consistency check
+		// (BackupEligible must not change) compares against the recorded value.
+		Flags: webauthn.CredentialFlags{
+			BackupEligible: c.BackupEligible,
+			BackupState:    c.BackupState,
+		},
 		Authenticator: webauthn.Authenticator{
 			AAGUID:       c.AAGUID,
 			SignCount:    c.SignCount,
@@ -49,6 +55,8 @@ func NewWebAuthnCredential(userID uint, cred *webauthn.Credential, friendlyName 
 		AAGUID:          cred.Authenticator.AAGUID,
 		SignCount:       cred.Authenticator.SignCount,
 		CloneWarning:    cred.Authenticator.CloneWarning,
+		BackupEligible:  cred.Flags.BackupEligible,
+		BackupState:     cred.Flags.BackupState,
 		Transports:      datatypes.JSON(raw),
 		FriendlyName:    friendlyName,
 	}

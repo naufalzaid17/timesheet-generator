@@ -100,6 +100,12 @@ type WebAuthnCredential struct {
 	AAGUID          []byte `json:"-"`
 	SignCount       uint32 `json:"-"`
 	CloneWarning    bool   `json:"-"`
+	// BackupEligible (BE) records whether the authenticator can back up / sync
+	// the credential. Per the WebAuthn spec this is immutable for the credential
+	// and MUST be persisted so it can be validated for consistency at login.
+	// BackupState (BS) records whether it currently is backed up; it may change.
+	BackupEligible bool `json:"-"`
+	BackupState    bool `json:"-"`
 	// Transports is stored as a JSON array of transport strings.
 	Transports   datatypes.JSON `json:"-"`
 	FriendlyName string         `gorm:"size:128" json:"friendly_name"`
