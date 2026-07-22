@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Fragment, useEffect, useState, useCallback } from "react";
 import {
   UserPlus,
   Loader2,
@@ -9,10 +9,13 @@ import {
   Ban,
   ShieldCheck,
   ClipboardList,
+  KeyRound,
+  Trash2,
+  Fingerprint,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
-import type { User, Role, ProfileChangeRequest } from "@/lib/types";
+import type { User, Role, ProfileChangeRequest, Passkey } from "@/lib/types";
 
 // Admin console for provisioning accounts (the ONLY registration path) and
 // reviewing self-service profile change requests.
@@ -22,6 +25,9 @@ export default function UsersPage() {
   const [changes, setChanges] = useState<ProfileChangeRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [passkeysFor, setPasskeysFor] = useState<number | null>(null);
+  const [userPasskeys, setUserPasskeys] = useState<Passkey[]>([]);
+  const [pkLoading, setPkLoading] = useState(false);
 
   const emptyForm = {
     username: "",
@@ -87,6 +93,36 @@ export default function UsersPage() {
       await api(`/api/admin/users/${u.id}`, { method: "DELETE" });
       notify("User deactivated", "success");
       load();
+    } catch (err: any) {
+      notify(err.message, "error");
+    }
+  };
+
+  const viewPasskeys = async (u: User) => {
+    if (passkeysFor === u.id) {
+      setPasskeysFor(null);
+      return;
+    }
+    setPasskeysFor(u.id);
+    setPkLoading(true);
+    try {
+      const pk = await api<Passkey[]>(`/api/admin/users/${u.id}/passkeys`);
+      setUserPasskeys(pk || []);
+    } catch (err: any) {
+      notify(err.message, "error");
+      setUserPasskeys([]);
+    } finally {
+      setPkLoading(false);
+    }
+  };
+
+  const removeUserPasskey = async (u: User, pk: Passkey) => {
+    if (!confirm(`Remove ${u.username}'s passkey "${pk.friendly_name || "Passkey"}"?`)) return;
+    try {
+      await api(`/api/admin/users/${u.id}/passkeys/${pk.id}`, { method: "DELETE" });
+      notify("Passkey removed", "success");
+      const pks = await api<Passkey[]>(`/api/admin/users/${u.id}/passkeys`);
+      setUserPasskeys(pks || []);
     } catch (err: any) {
       notify(err.message, "error");
     }
@@ -240,7 +276,8 @@ export default function UsersPage() {
                   </thead>
                   <tbody>
                     {users.map((u) => (
-                      <tr key={u.id} className="border-t border-mr-ink">
+                      <Fragment key={u.id}>
+                      <tr className="border-t border-mr-ink">
                         <td className="py-3">
                           <p className="font-semibold">{u.name || u.username}</p>
                           <p className="text-xs text-mr-muted">{u.email}</p>
@@ -269,18 +306,76 @@ export default function UsersPage() {
                             {u.is_active ? "Active" : "Disabled"}
                           </button>
                         </td>
-                        <td className="py-3 text-right">
-                          {u.is_active && (
+                        <td className="py-3">
+                          <div className="flex items-center justify-end gap-2">
                             <button
-                              onClick={() => deactivateUser(u)}
-                              className="border-2 border-mr-ink p-2 text-mr-muted hover:bg-mr-pink hover:text-white"
-                              title="Deactivate user"
+                              onClick={() => viewPasskeys(u)}
+                              className={`border-2 border-mr-ink p-2 ${
+                                passkeysFor === u.id
+                                  ? "bg-mr-purple text-white"
+                                  : "text-mr-muted hover:bg-mr-surface2"
+                              }`}
+                              title="Manage passkeys"
                             >
-                              <Ban size={16} />
+                              <KeyRound size={16} />
                             </button>
-                          )}
+                            {u.is_active && (
+                              <button
+                                onClick={() => deactivateUser(u)}
+                                className="border-2 border-mr-ink p-2 text-mr-muted hover:bg-mr-pink hover:text-white"
+                                title="Deactivate user"
+                              >
+                                <Ban size={16} />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
+                      {passkeysFor === u.id && (
+                        <tr>
+                          <td colSpan={4} className="border-t-2 border-mr-ink bg-mr-surface2 p-4">
+                            <div className="mb-2 flex items-center gap-2 text-xs font-extrabold uppercase text-mr-muted">
+                              <KeyRound size={14} /> Passkeys for {u.username}
+                            </div>
+                            {pkLoading ? (
+                              <div className="flex justify-center py-3">
+                                <Loader2 size={18} className="animate-spin text-mr-purple" />
+                              </div>
+                            ) : userPasskeys.length === 0 ? (
+                              <p className="text-sm text-mr-muted">
+                                This user has no passkeys.
+                              </p>
+                            ) : (
+                              <div className="flex flex-col gap-2">
+                                {userPasskeys.map((pk) => (
+                                  <div
+                                    key={pk.id}
+                                    className="flex items-center justify-between gap-3 border-2 border-mr-ink bg-mr-surface px-3 py-2"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Fingerprint size={16} className="text-mr-purple" />
+                                      <div>
+                                        <p className="text-sm font-semibold">{pk.friendly_name || "Passkey"}</p>
+                                        <p className="text-xs text-mr-muted">
+                                          Added {new Date(pk.created_at).toLocaleDateString()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => removeUserPasskey(u, pk)}
+                                      className="border-2 border-mr-ink p-2 text-mr-muted hover:bg-mr-pink hover:text-white"
+                                      title="Remove passkey"
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>

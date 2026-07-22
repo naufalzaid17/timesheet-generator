@@ -23,6 +23,7 @@ interface NavItem {
 const adminNav: NavItem[] = [
   { href: "/users", label: "Users", icon: Users },
   { href: "/template-builder", label: "Template Builder", icon: LayoutTemplate },
+  { href: "/profile", label: "Profile", icon: UserRound },
 ];
 
 const userNav: NavItem[] = [

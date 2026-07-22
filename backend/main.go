@@ -93,9 +93,11 @@ func registerRoutes(r *gin.Engine, s *handlers.Server) {
 		authed.POST("/profile/change", s.SubmitProfileChange)
 		authed.GET("/profile/changes", s.MyProfileChanges)
 
-		// Passkey registration for the logged-in user.
+		// Passkey registration + self-service management for the logged-in user.
 		authed.POST("/passkey/register/begin", s.BeginPasskeyRegistration)
 		authed.POST("/passkey/register/finish", s.FinishPasskeyRegistration)
+		authed.GET("/passkeys", s.ListPasskeys)
+		authed.DELETE("/passkeys/:id", s.DeletePasskey)
 
 		// Daily activity entry + monthly view + generation.
 		authed.POST("/activities", s.UpsertDailyActivity)
@@ -121,6 +123,8 @@ func registerRoutes(r *gin.Engine, s *handlers.Server) {
 		admin.POST("/users", s.CreateUser)
 		admin.PATCH("/users/:id", s.UpdateUser)
 		admin.DELETE("/users/:id", s.DeleteUser)
+		admin.GET("/users/:id/passkeys", s.AdminListPasskeys)
+		admin.DELETE("/users/:id/passkeys/:pid", s.AdminDeletePasskey)
 
 		admin.GET("/profile-changes", s.ListProfileChanges)
 		admin.POST("/profile-changes/:id/review", s.ReviewProfileChange)

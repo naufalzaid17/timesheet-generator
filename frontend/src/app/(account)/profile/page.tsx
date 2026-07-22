@@ -1,21 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, UserRound, Clock } from "lucide-react";
+import { Loader2, UserRound, Clock, KeyRound, Plus, Trash2, Fingerprint } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
-import type { ProfileChangeRequest } from "@/lib/types";
+import { registerPasskey, passkeysSupported } from "@/lib/webauthn";
+import type { ProfileChangeRequest, Passkey } from "@/lib/types";
 
-// User profile page. Edits are not applied immediately — they are submitted as a
-// pending request that an admin must approve (backend enforces this).
+// Account page for any authenticated user (user OR admin): profile details
+// (edits require admin approval) and self-service passkey management.
 export default function ProfilePage() {
   const { user, refresh } = useAuth();
   const { notify } = useToast();
 
   const [form, setForm] = useState({ name: "", mii_id: "", division: "", site: "" });
   const [changes, setChanges] = useState<ProfileChangeRequest[]>([]);
+  const [passkeys, setPasskeys] = useState<Passkey[]>([]);
   const [saving, setSaving] = useState(false);
+  const [addingKey, setAddingKey] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,21 +32,23 @@ export default function ProfilePage() {
     }
   }, [user]);
 
-  const loadChanges = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await api<ProfileChangeRequest[]>("/api/profile/changes");
-      setChanges(list || []);
-    } catch {
-      /* non-fatal */
+      const [ch, pk] = await Promise.all([
+        api<ProfileChangeRequest[]>("/api/profile/changes").catch(() => []),
+        api<Passkey[]>("/api/passkeys").catch(() => []),
+      ]);
+      setChanges(ch || []);
+      setPasskeys(pk || []);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadChanges();
-  }, [loadChanges]);
+    load();
+  }, [load]);
 
   const set = (k: keyof typeof form, v: string) => setForm({ ...form, [k]: v });
 
@@ -53,12 +58,41 @@ export default function ProfilePage() {
     try {
       await api("/api/profile/change", { method: "POST", body: JSON.stringify(form) });
       notify("Change requested — waiting for admin approval.", "success");
-      loadChanges();
+      load();
       refresh();
     } catch (err: any) {
       notify(err.message || "Request failed", "error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const addPasskey = async () => {
+    setAddingKey(true);
+    try {
+      await registerPasskey(`${user?.username}'s device`);
+      notify("Passkey added", "success");
+      load();
+    } catch (err: any) {
+      notify(
+        err?.name === "NotAllowedError"
+          ? "Passkey setup was cancelled or timed out."
+          : err.message || "Could not add passkey",
+        "error"
+      );
+    } finally {
+      setAddingKey(false);
+    }
+  };
+
+  const removePasskey = async (pk: Passkey) => {
+    if (!confirm(`Remove passkey "${pk.friendly_name || "Passkey"}"?`)) return;
+    try {
+      await api(`/api/passkeys/${pk.id}`, { method: "DELETE" });
+      notify("Passkey removed", "success");
+      load();
+    } catch (err: any) {
+      notify(err.message || "Remove failed", "error");
     }
   };
 
@@ -81,7 +115,7 @@ export default function ProfilePage() {
         </div>
         <div>
           <h1 className="text-2xl font-extrabold">My Profile</h1>
-          <p className="text-sm text-mr-muted">Profile edits require admin approval.</p>
+          <p className="text-sm text-mr-muted">Manage your account, passkeys, and profile details.</p>
         </div>
       </div>
 
@@ -102,6 +136,58 @@ export default function ProfilePage() {
             <span className="chip bg-mr-purple text-white">{user?.role}</span>
           </div>
         </div>
+      </div>
+
+      {/* Passkeys (self-service) */}
+      <div className="card p-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <KeyRound size={18} className="text-mr-purple" />
+            <h2 className="text-lg font-bold">Passkeys</h2>
+            <span className="chip bg-mr-surface2 text-mr-muted">{passkeys.length}</span>
+          </div>
+          {passkeysSupported() && (
+            <button onClick={addPasskey} disabled={addingKey} className="btn-primary text-sm">
+              {addingKey ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              Add passkey
+            </button>
+          )}
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-6">
+            <Loader2 className="animate-spin text-mr-purple" />
+          </div>
+        ) : passkeys.length === 0 ? (
+          <p className="text-sm text-mr-muted">
+            No passkeys yet. Add one to sign in without a password.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {passkeys.map((pk) => (
+              <div
+                key={pk.id}
+                className="flex items-center justify-between gap-3 border-2 border-mr-ink bg-mr-surface2 px-4 py-2"
+              >
+                <div className="flex items-center gap-3">
+                  <Fingerprint size={18} className="text-mr-purple" />
+                  <div>
+                    <p className="text-sm font-semibold">{pk.friendly_name || "Passkey"}</p>
+                    <p className="text-xs text-mr-muted">
+                      Added {new Date(pk.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => removePasskey(pk)}
+                  className="border-2 border-mr-ink p-2 text-mr-muted hover:bg-mr-pink hover:text-white"
+                  title="Remove passkey"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Editable profile → pending request */}

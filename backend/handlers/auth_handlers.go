@@ -278,6 +278,63 @@ func (s *Server) FinishPasskeyLogin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": token, "user": user})
 }
 
+// --- Passkey management (self-service for any authenticated user) ---
+
+// ListPasskeys returns the current user's registered passkeys.
+func (s *Server) ListPasskeys(c *gin.Context) {
+	var creds []models.WebAuthnCredential
+	if err := s.DB.Where("user_id = ?", currentUserID(c)).
+		Order("created_at desc").Find(&creds).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, creds)
+}
+
+// DeletePasskey removes one of the current user's own passkeys.
+func (s *Server) DeletePasskey(c *gin.Context) {
+	res := s.DB.Where("id = ? AND user_id = ?", c.Param("id"), currentUserID(c)).
+		Delete(&models.WebAuthnCredential{})
+	if res.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": res.Error.Error()})
+		return
+	}
+	if res.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "passkey not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "passkey removed"})
+}
+
+// --- Passkey management (admin, for any user) ---
+
+// AdminListPasskeys lists a given user's passkeys (admin only).
+func (s *Server) AdminListPasskeys(c *gin.Context) {
+	var creds []models.WebAuthnCredential
+	if err := s.DB.Where("user_id = ?", c.Param("id")).
+		Order("created_at desc").Find(&creds).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, creds)
+}
+
+// AdminDeletePasskey removes a given user's passkey (admin only) — e.g. to let a
+// user recover after losing a device or a broken credential.
+func (s *Server) AdminDeletePasskey(c *gin.Context) {
+	res := s.DB.Where("id = ? AND user_id = ?", c.Param("pid"), c.Param("id")).
+		Delete(&models.WebAuthnCredential{})
+	if res.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": res.Error.Error()})
+		return
+	}
+	if res.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "passkey not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "passkey removed"})
+}
+
 // decodeUserHandle reverses User.WebAuthnID (little-endian uint64 -> id).
 func decodeUserHandle(b []byte) uint {
 	var id uint

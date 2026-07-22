@@ -64,6 +64,13 @@ export interface DailyActivity {
   app_impacted: string;
 }
 
+export interface Passkey {
+  id: number;
+  user_id: number;
+  friendly_name: string;
+  created_at: string;
+}
+
 export interface ProfileChangeRequest {
   id: number;
   user_id: number;
