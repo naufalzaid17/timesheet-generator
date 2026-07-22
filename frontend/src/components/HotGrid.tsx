@@ -40,7 +40,7 @@ const HotGrid = forwardRef<any, HotGridProps>(function HotGrid(props, ref) {
       stretchH="all"
       manualColumnResize
       licenseKey="non-commercial-and-evaluation"
-      className="ht-saweria"
+      className="ht-mr"
     />
   );
 });

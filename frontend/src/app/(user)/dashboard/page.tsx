@@ -211,18 +211,15 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-6">
       {/* Greeting hero */}
       <div className="card overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-saweria-purple to-saweria-purpleDark p-6 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-mr-yellow p-6 text-black">
           <div>
-            <p className="text-sm opacity-80">Halo,</p>
+            <p className="text-sm font-bold opacity-70">Halo,</p>
             <h1 className="text-2xl font-extrabold">{user?.name || user?.username} 👋</h1>
-            <p className="mt-1 text-sm opacity-80">
+            <p className="mt-1 text-sm font-semibold opacity-70">
               {filledCount} day{filledCount === 1 ? "" : "s"} filled this month.
             </p>
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="btn bg-saweria-yellow text-saweria-ink hover:bg-saweria-amber"
-          >
+          <button onClick={() => setShowModal(true)} className="btn-primary">
             <Plus size={18} /> Today&apos;s Activity
           </button>
         </div>
@@ -232,37 +229,37 @@ export default function DashboardPage() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <button
           onClick={() => setShowModal(true)}
-          className="card flex items-center gap-3 p-4 text-left transition hover:shadow-lift"
+          className="card flex items-center gap-3 p-4 text-left transition hover:shadow-hard"
         >
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-saweria-yellow">
+          <div className="grid h-10 w-10 place-items-center bg-mr-yellow text-black">
             <Plus size={18} />
           </div>
           <div>
             <p className="text-sm font-bold">Daily entry</p>
-            <p className="text-xs text-saweria-slate">Add today or a past date</p>
+            <p className="text-xs text-mr-muted">Add today or a past date</p>
           </div>
         </button>
 
         <button
           onClick={generate}
           disabled={generating}
-          className="card flex items-center gap-3 p-4 text-left transition hover:shadow-lift"
+          className="card flex items-center gap-3 p-4 text-left transition hover:shadow-hard"
         >
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-saweria-mint/15 text-saweria-mint">
+          <div className="grid h-10 w-10 place-items-center  bg-mr-cyan text-mr-ink">
             {generating ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
           </div>
           <div>
             <p className="text-sm font-bold">Generate</p>
-            <p className="text-xs text-saweria-slate">Download & email .xlsx</p>
+            <p className="text-xs text-mr-muted">Download & email .xlsx</p>
           </div>
         </button>
 
         <button
           onClick={handleEnablePush}
           disabled={pushBusy || !pushSupported()}
-          className="card flex items-center gap-3 p-4 text-left transition hover:shadow-lift disabled:opacity-60"
+          className="card flex items-center gap-3 p-4 text-left transition hover:shadow-hard disabled:opacity-60"
         >
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-saweria-purple/10 text-saweria-purple">
+          <div className="grid h-10 w-10 place-items-center  bg-mr-purple text-white">
             {pushBusy ? (
               <Loader2 size={18} className="animate-spin" />
             ) : pushOn ? (
@@ -273,21 +270,21 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="text-sm font-bold">{pushOn ? "Reminders on" : "Enable reminders"}</p>
-            <p className="text-xs text-saweria-slate">Daily push at 17:00 WIB</p>
+            <p className="text-xs text-mr-muted">Daily push at 17:00 WIB</p>
           </div>
         </button>
 
         <button
           onClick={handleAddPasskey}
           disabled={!passkeysSupported()}
-          className="card flex items-center gap-3 p-4 text-left transition hover:shadow-lift disabled:opacity-60"
+          className="card flex items-center gap-3 p-4 text-left transition hover:shadow-hard disabled:opacity-60"
         >
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-saweria-coral/15 text-saweria-coral">
+          <div className="grid h-10 w-10 place-items-center  bg-mr-pink text-white">
             <Fingerprint size={18} />
           </div>
           <div>
             <p className="text-sm font-bold">Add passkey</p>
-            <p className="text-xs text-saweria-slate">Passwordless sign-in</p>
+            <p className="text-xs text-mr-muted">Passwordless sign-in</p>
           </div>
         </button>
       </div>
@@ -296,7 +293,7 @@ export default function DashboardPage() {
       <div className="card p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <CalendarRange size={18} className="text-saweria-purple" />
+            <CalendarRange size={18} className="text-mr-purple" />
             <h2 className="text-lg font-bold">Monthly timesheet</h2>
           </div>
           <div className="flex gap-2">
@@ -326,14 +323,14 @@ export default function DashboardPage() {
         </div>
 
         {fillableFields.size === 0 && templates.length > 0 && (
-          <p className="mb-3 rounded-2xl bg-saweria-yellow/20 px-4 py-2 text-sm text-saweria-ink">
+          <p className="mb-3 border-2 border-mr-ink bg-mr-yellow px-4 py-2 text-sm font-semibold text-mr-ink">
             No fillable columns are configured yet — ask an admin to map the template.
           </p>
         )}
 
         {loading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="animate-spin text-saweria-purple" />
+            <Loader2 className="animate-spin text-mr-purple" />
           </div>
         ) : (
           <HotGrid
@@ -344,7 +341,7 @@ export default function DashboardPage() {
             height={480}
           />
         )}
-        <p className="mt-3 text-xs text-saweria-slate">
+        <p className="mt-3 text-xs text-mr-muted">
           Only columns your admin marked as fillable are editable. Edits save automatically.
         </p>
       </div>

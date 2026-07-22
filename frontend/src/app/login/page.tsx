@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CalendarCheck, KeyRound, Fingerprint, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
+import ThemeToggle from "@/components/ThemeToggle";
 import { loginWithPasskey, passkeysSupported } from "@/lib/webauthn";
 import { api, getToken } from "@/lib/api";
 
@@ -77,14 +78,17 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="relative flex min-h-screen items-center justify-center p-4">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-3 grid h-16 w-16 place-items-center rounded-3xl bg-saweria-yellow shadow-pop">
-            <CalendarCheck size={30} className="text-saweria-ink" />
+          <div className="mb-3 grid h-16 w-16 place-items-center bg-mr-yellow text-black shadow-hard">
+            <CalendarCheck size={30} className="text-black" />
           </div>
           <h1 className="text-2xl font-extrabold">Timesheet Portal</h1>
-          <p className="mt-1 text-sm text-saweria-slate">
+          <p className="mt-1 text-sm text-mr-muted">
             Sign in to fill today&apos;s activity ✨
           </p>
         </div>
@@ -135,7 +139,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowForgot(true)}
-                className="text-center text-sm font-semibold text-saweria-purple hover:underline"
+                className="text-center text-sm font-semibold text-mr-purple hover:underline"
               >
                 Forgot your password?
               </button>
@@ -152,7 +156,7 @@ export default function LoginPage() {
                   placeholder="you@company.com"
                   required
                 />
-                <p className="mt-2 text-xs text-saweria-slate">
+                <p className="mt-2 text-xs text-mr-muted">
                   We&apos;ll email you a link to reset your password.
                 </p>
               </div>
@@ -163,7 +167,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowForgot(false)}
-                className="text-center text-sm font-semibold text-saweria-purple hover:underline"
+                className="text-center text-sm font-semibold text-mr-purple hover:underline"
               >
                 Back to sign in
               </button>
@@ -171,7 +175,7 @@ export default function LoginPage() {
           )}
         </div>
 
-        <p className="mt-4 text-center text-xs text-saweria-slate">
+        <p className="mt-4 text-center text-xs text-mr-muted">
           Accounts are provisioned by administrators. Contact your admin for access.
         </p>
       </div>

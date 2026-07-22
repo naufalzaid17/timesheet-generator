@@ -206,7 +206,7 @@ export default function TemplateBuilderPage() {
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold">Template Builder</h1>
-          <p className="text-sm text-saweria-slate">
+          <p className="text-sm text-mr-muted">
             Upload a client template, then click cells to map their purpose.
           </p>
         </div>
@@ -226,8 +226,8 @@ export default function TemplateBuilderPage() {
               onClick={() => setActiveId(t.id)}
               className={`chip px-4 py-2 ${
                 activeId === t.id
-                  ? "bg-saweria-purple text-white"
-                  : "bg-white text-saweria-ink border border-slate-200"
+                  ? "bg-mr-purple text-white"
+                  : "bg-mr-surface text-mr-ink border border-mr-ink"
               }`}
             >
               <Tag size={14} /> {t.name}
@@ -242,7 +242,7 @@ export default function TemplateBuilderPage() {
         <div className="card p-4 lg:col-span-3">
           {loadingGrid ? (
             <div className="flex justify-center py-16">
-              <Loader2 className="animate-spin text-saweria-purple" />
+              <Loader2 className="animate-spin text-mr-purple" />
             </div>
           ) : grid.length ? (
             <HotGrid
@@ -253,7 +253,7 @@ export default function TemplateBuilderPage() {
               afterSelectionEnd={(r, c) => setSelection({ row: r, col: c })}
             />
           ) : (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-saweria-slate">
+            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-mr-muted">
               <MousePointerClick size={32} />
               <p>Upload a template to begin mapping.</p>
             </div>
@@ -264,14 +264,14 @@ export default function TemplateBuilderPage() {
         <div className="flex flex-col gap-4 lg:col-span-1">
           <div className="card p-5">
             <h2 className="mb-3 text-lg font-bold">Assign field</h2>
-            <div className="mb-3 rounded-2xl bg-slate-50 p-3 text-sm">
+            <div className="mb-3  bg-mr-surface2 p-3 text-sm">
               {selection ? (
-                <span className="font-semibold text-saweria-purple">
+                <span className="font-semibold text-mr-purple">
                   Selected: {colToLetter(selection.col)}
                   {selection.row + 1}
                 </span>
               ) : (
-                <span className="text-saweria-slate">Click a cell in the grid…</span>
+                <span className="text-mr-muted">Click a cell in the grid…</span>
               )}
             </div>
 
@@ -300,7 +300,7 @@ export default function TemplateBuilderPage() {
               </label>
             )}
 
-            <p className="mb-3 text-xs text-saweria-slate">
+            <p className="mb-3 text-xs text-mr-muted">
               {selectedField.scope === "daily_column"
                 ? "Anchors day 1 at the selected row; subsequent days fill downward."
                 : "Maps a single fixed cell (header metadata)."}
@@ -314,20 +314,20 @@ export default function TemplateBuilderPage() {
           <div className="card p-5">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-bold">Mappings</h2>
-              <span className="chip bg-slate-100 text-saweria-slate">{mappings.length}</span>
+              <span className="chip bg-mr-surface2 text-mr-muted">{mappings.length}</span>
             </div>
             <div className="flex flex-col gap-2">
               {mappings.length === 0 && (
-                <p className="text-sm text-saweria-slate">No mappings yet.</p>
+                <p className="text-sm text-mr-muted">No mappings yet.</p>
               )}
               {mappings.map((m) => (
                 <div
                   key={m.field}
-                  className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2 text-sm"
+                  className="flex items-center justify-between  bg-mr-surface2 px-3 py-2 text-sm"
                 >
                   <div>
                     <p className="font-semibold">{m.field}</p>
-                    <p className="text-xs text-saweria-slate">
+                    <p className="text-xs text-mr-muted">
                       {m.scope === "daily_column"
                         ? `Col ${m.column} · row ${m.start_row}${m.fillable ? " · fillable" : ""}`
                         : `Cell ${m.cell_ref}`}
@@ -335,7 +335,7 @@ export default function TemplateBuilderPage() {
                   </div>
                   <button
                     onClick={() => removeMapping(m.field)}
-                    className="rounded-xl p-1.5 text-saweria-slate hover:bg-saweria-coral/10 hover:text-saweria-coral"
+                    className=" p-1.5 text-mr-muted hover:bg-mr-pink hover:text-white"
                   >
                     <Trash2 size={14} />
                   </button>

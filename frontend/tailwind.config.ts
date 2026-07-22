@@ -1,7 +1,11 @@
 import type { Config } from "tailwindcss";
 
-// Saweria-inspired palette: bold, friendly flat colors, soft whites, vibrant
-// yellow + purple accents. Rounded, crisp, playful-but-professional.
+// "Maman Racing" design system — bold Neobrutalism: thick black borders, hard
+// offset shadows, saturated flat accents, Rubik + IBM Plex Mono type.
+//
+// Colors resolve to CSS variables defined in globals.css (:root and
+// [data-theme="dark"]), so the whole palette re-themes for dark mode without
+// touching component markup.
 const config: Config = {
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -11,30 +15,37 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        saweria: {
-          yellow: "#FFC700",
-          amber: "#FFB800",
-          purple: "#6C5CE7",
-          purpleDark: "#4834D4",
-          ink: "#1E1B4B",
-          slate: "#64748B",
-          cloud: "#F8FAFC",
-          soft: "#FFFFFF",
-          mint: "#00D9A3",
-          coral: "#FF6B6B",
+        mr: {
+          ink: "var(--fg)",
+          border: "var(--border)",
+          paper: "var(--bg-page)",
+          surface: "var(--bg-surface)",
+          surface2: "var(--bg-surface-secondary)",
+          muted: "var(--text-muted)",
+          main: "var(--main)",
+          purple: "var(--accent-purple)",
+          yellow: "var(--accent-yellow)",
+          cyan: "var(--accent-cyan)",
+          pink: "var(--accent-pink)",
+          blue: "var(--accent-blue)",
+          dangerBg: "var(--danger-bg)",
+          dangerFg: "var(--danger-fg)",
         },
       },
-      borderRadius: {
-        "2xl": "1rem",
-        "3xl": "1.5rem",
-      },
       boxShadow: {
-        soft: "0 4px 20px rgba(108, 92, 231, 0.08)",
-        lift: "0 10px 30px rgba(108, 92, 231, 0.15)",
-        pop: "0 6px 0 0 rgba(72, 52, 212, 0.2)",
+        hard: "8px 8px 0 0 var(--ink)",
+        "hard-md": "4px 4px 0 0 var(--ink)",
+        "hard-sm": "2px 2px 0 0 var(--ink)",
+        "hard-lg": "10px 10px 0 0 var(--ink)",
+      },
+      borderWidth: {
+        DEFAULT: "2px",
+        3: "3px",
+        4: "4px",
       },
       fontFamily: {
-        sans: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
+        sans: ["Rubik", "system-ui", "sans-serif"],
+        mono: ["IBM Plex Mono", "ui-monospace", "monospace"],
       },
     },
   },

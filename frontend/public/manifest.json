@@ -4,8 +4,8 @@
   "description": "Friendly internal portal for daily timesheet entry and reminders.",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#F8FAFC",
-  "theme_color": "#6C5CE7",
+  "background_color": "#EDFBF5",
+  "theme_color": "#FACC00",
   "icons": [
     {
       "src": "/icon-192.png",

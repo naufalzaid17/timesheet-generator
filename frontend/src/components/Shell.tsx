@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import ThemeToggle from "@/components/ThemeToggle";
 import {
   LayoutDashboard,
   Users,
@@ -48,12 +49,12 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         <aside className="hidden w-64 shrink-0 md:block">
           <div className="card sticky top-6 p-5">
             <div className="mb-6 flex items-center gap-2">
-              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-saweria-yellow">
+              <div className="grid h-10 w-10 place-items-center bg-mr-yellow text-black">
                 <CalendarCheck size={20} />
               </div>
               <div>
                 <p className="text-sm font-extrabold leading-tight">Timesheet</p>
-                <p className="text-xs text-saweria-slate">Portal</p>
+                <p className="text-xs text-mr-muted">Portal</p>
               </div>
             </div>
 
@@ -65,10 +66,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
+                    className={`flex items-center gap-3  px-4 py-2.5 text-sm font-semibold transition ${
                       active
-                        ? "bg-saweria-purple text-white shadow-soft"
-                        : "text-saweria-ink hover:bg-slate-100"
+                        ? "bg-mr-purple text-white shadow-hard-sm"
+                        : "text-mr-ink hover:bg-mr-surface2"
                     }`}
                   >
                     <Icon size={18} />
@@ -78,19 +79,22 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               })}
             </nav>
 
-            <div className="mt-6 border-t border-slate-100 pt-4">
+            <div className="mt-6 border-t border-mr-ink pt-4">
               <div className="mb-3 flex items-center gap-3 px-2">
-                <div className="grid h-9 w-9 place-items-center rounded-full bg-saweria-purple/10 text-sm font-bold text-saweria-purple">
+                <div className="grid h-9 w-9 place-items-center rounded-full border-2 border-mr-ink bg-mr-yellow text-sm font-bold text-mr-ink">
                   {(user?.name || user?.username || "?").charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{user?.name || user?.username}</p>
-                  <p className="truncate text-xs capitalize text-saweria-slate">{user?.role}</p>
+                  <p className="truncate text-xs capitalize text-mr-muted">{user?.role}</p>
                 </div>
               </div>
-              <button onClick={handleLogout} className="btn-ghost w-full text-sm">
-                <LogOut size={16} /> Sign out
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={handleLogout} className="btn-ghost flex-1 text-sm">
+                  <LogOut size={16} /> Sign out
+                </button>
+                <ThemeToggle />
+              </div>
             </div>
           </div>
         </aside>
@@ -99,10 +103,13 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         <main className="min-w-0 flex-1">
           {/* Mobile top bar */}
           <div className="card mb-4 flex items-center justify-between p-3 md:hidden">
-            <span className="font-extrabold">Timesheet Portal</span>
-            <button onClick={handleLogout} className="btn-ghost text-sm">
-              <LogOut size={16} />
-            </button>
+            <span className="font-extrabold uppercase">Timesheet Portal</span>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <button onClick={handleLogout} className="btn-ghost text-sm">
+                <LogOut size={16} />
+              </button>
+            </div>
           </div>
           {children}
         </main>

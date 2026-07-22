@@ -48,16 +48,16 @@ function ResetPasswordInner() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-3 grid h-16 w-16 place-items-center rounded-3xl bg-saweria-purple shadow-pop">
+          <div className="mb-3 grid h-16 w-16 place-items-center  bg-mr-purple shadow-hard">
             <ShieldCheck size={30} className="text-white" />
           </div>
           <h1 className="text-2xl font-extrabold">Set your password</h1>
-          <p className="mt-1 text-sm text-saweria-slate">Choose a strong new password.</p>
+          <p className="mt-1 text-sm text-mr-muted">Choose a strong new password.</p>
         </div>
 
         <form onSubmit={submit} className="card flex flex-col gap-4 p-6">
           {!token && (
-            <p className="rounded-2xl bg-saweria-coral/10 px-4 py-2 text-sm text-saweria-coral">
+            <p className="border-2 border-mr-ink bg-mr-dangerBg px-4 py-2 text-sm font-semibold text-mr-dangerFg">
               Missing reset token. Use the link from your email.
             </p>
           )}
@@ -98,7 +98,7 @@ export default function ResetPasswordPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center">
-          <Loader2 className="animate-spin text-saweria-purple" />
+          <Loader2 className="animate-spin text-mr-purple" />
         </div>
       }
     >

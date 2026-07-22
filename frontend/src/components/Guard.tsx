@@ -31,8 +31,8 @@ export default function Guard({
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-saweria-purple/20 border-t-saweria-purple" />
-          <p className="text-sm text-saweria-slate">Loading your portal…</p>
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-mr-surface2 border-t-mr-purple" />
+          <p className="text-sm text-mr-muted">Loading your portal…</p>
         </div>
       </div>
     );

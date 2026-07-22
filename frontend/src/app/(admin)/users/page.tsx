@@ -109,7 +109,7 @@ export default function UsersPage() {
     <div className="flex flex-col gap-6">
       <header>
         <h1 className="text-2xl font-extrabold">Users</h1>
-        <p className="text-sm text-saweria-slate">
+        <p className="text-sm text-mr-muted">
           Provision accounts and approve profile changes.
         </p>
       </header>
@@ -118,7 +118,7 @@ export default function UsersPage() {
         {/* Create user */}
         <div className="card h-fit p-6 lg:col-span-1">
           <div className="mb-4 flex items-center gap-2">
-            <div className="grid h-9 w-9 place-items-center rounded-2xl bg-saweria-yellow">
+            <div className="grid h-9 w-9 place-items-center bg-mr-yellow text-black">
               <UserPlus size={18} />
             </div>
             <h2 className="text-lg font-bold">New account</h2>
@@ -185,32 +185,32 @@ export default function UsersPage() {
           {changes.length > 0 && (
             <div className="card p-6">
               <div className="mb-4 flex items-center gap-2">
-                <ClipboardList size={18} className="text-saweria-purple" />
+                <ClipboardList size={18} className="text-mr-purple" />
                 <h2 className="text-lg font-bold">Pending profile changes</h2>
-                <span className="chip bg-saweria-yellow text-saweria-ink">{changes.length}</span>
+                <span className="chip bg-mr-yellow text-mr-ink">{changes.length}</span>
               </div>
               <div className="flex flex-col gap-3">
                 {changes.map((c) => (
                   <div
                     key={c.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 p-4"
+                    className="flex flex-wrap items-center justify-between gap-3  bg-mr-surface2 p-4"
                   >
                     <div className="text-sm">
                       <p className="font-semibold">{c.user?.username || `User #${c.user_id}`}</p>
-                      <p className="text-saweria-slate">
+                      <p className="text-mr-muted">
                         {[c.name, c.mii_id, c.division, c.site].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => review(c, "approve")}
-                        className="btn bg-saweria-mint/15 text-saweria-mint hover:bg-saweria-mint/25"
+                        className="btn border-2 border-mr-ink bg-mr-cyan text-mr-ink"
                       >
                         <Check size={16} /> Approve
                       </button>
                       <button
                         onClick={() => review(c, "reject")}
-                        className="btn bg-saweria-coral/15 text-saweria-coral hover:bg-saweria-coral/25"
+                        className="btn border-2 border-mr-ink bg-mr-pink text-white"
                       >
                         <X size={16} /> Reject
                       </button>
@@ -225,13 +225,13 @@ export default function UsersPage() {
             <h2 className="mb-4 text-lg font-bold">All users</h2>
             {loading ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="animate-spin text-saweria-purple" />
+                <Loader2 className="animate-spin text-mr-purple" />
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="text-xs uppercase text-saweria-slate">
+                    <tr className="text-xs uppercase text-mr-muted">
                       <th className="pb-2">User</th>
                       <th className="pb-2">Role</th>
                       <th className="pb-2">Status</th>
@@ -240,17 +240,17 @@ export default function UsersPage() {
                   </thead>
                   <tbody>
                     {users.map((u) => (
-                      <tr key={u.id} className="border-t border-slate-100">
+                      <tr key={u.id} className="border-t border-mr-ink">
                         <td className="py-3">
                           <p className="font-semibold">{u.name || u.username}</p>
-                          <p className="text-xs text-saweria-slate">{u.email}</p>
+                          <p className="text-xs text-mr-muted">{u.email}</p>
                         </td>
                         <td className="py-3">
                           <span
                             className={`chip ${
                               u.role === "admin"
-                                ? "bg-saweria-purple/10 text-saweria-purple"
-                                : "bg-slate-100 text-saweria-slate"
+                                ? "bg-mr-purple text-white"
+                                : "bg-mr-surface2 text-mr-muted"
                             }`}
                           >
                             {u.role === "admin" && <ShieldCheck size={12} />}
@@ -262,8 +262,8 @@ export default function UsersPage() {
                             onClick={() => toggleActive(u)}
                             className={`chip ${
                               u.is_active
-                                ? "bg-saweria-mint/15 text-saweria-mint"
-                                : "bg-saweria-coral/15 text-saweria-coral"
+                                ? "bg-mr-cyan text-mr-ink"
+                                : "bg-mr-pink text-white"
                             }`}
                           >
                             {u.is_active ? "Active" : "Disabled"}
@@ -272,7 +272,7 @@ export default function UsersPage() {
                         <td className="py-3 text-right">
                           <button
                             onClick={() => removeUser(u)}
-                            className="rounded-xl p-2 text-saweria-slate hover:bg-saweria-coral/10 hover:text-saweria-coral"
+                            className=" p-2 text-mr-muted hover:bg-mr-pink hover:text-white"
                             title="Delete user"
                           >
                             <Trash2 size={16} />

@@ -52,19 +52,19 @@ export default function DailyModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-saweria-ink/40 p-4 backdrop-blur-sm">
-      <div className="card w-full max-w-lg p-6 shadow-lift">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="card w-full max-w-lg p-6 shadow-hard">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-saweria-yellow">
+            <div className="grid h-10 w-10 place-items-center bg-mr-yellow text-black">
               <CalendarDays size={20} />
             </div>
             <div>
               <h2 className="text-lg font-extrabold">Today&apos;s Activity</h2>
-              <p className="text-xs text-saweria-slate">Fill in what you worked on.</p>
+              <p className="text-xs text-mr-muted">Fill in what you worked on.</p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-xl p-2 hover:bg-slate-100">
+          <button onClick={onClose} className=" p-2 hover:bg-mr-surface2">
             <X size={18} />
           </button>
         </div>

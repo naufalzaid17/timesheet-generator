@@ -36,14 +36,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             t.kind === "success" ? CheckCircle2 : t.kind === "error" ? XCircle : Info;
           const color =
             t.kind === "success"
-              ? "text-saweria-mint"
+              ? "text-mr-cyan"
               : t.kind === "error"
-              ? "text-saweria-coral"
-              : "text-saweria-purple";
+              ? "text-mr-pink"
+              : "text-mr-purple";
           return (
             <div
               key={t.id}
-              className="card pointer-events-auto flex items-center gap-3 px-4 py-3 shadow-lift"
+              className="card pointer-events-auto flex items-center gap-3 px-4 py-3 shadow-hard"
             >
               <Icon size={18} className={color} />
               <span className="text-sm font-medium">{t.message}</span>
