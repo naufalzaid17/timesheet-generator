@@ -130,6 +130,18 @@ func (s *Server) GenerateTimesheet(c *gin.Context) {
 	var activities []models.DailyActivity
 	s.DB.Where("user_id = ? AND date >= ? AND date < ?", user.ID, start, end).Find(&activities)
 
+	// Fetch public holidays for the month so weekends/holidays are reflected in
+	// the generated sheet (best-effort; generation still proceeds on failure).
+	holidays := map[int]string{}
+	if hs, herr := services.FetchHolidays(req.Year, req.Month); herr == nil {
+		for _, h := range hs {
+			var y, m, d int
+			if _, e := fmt.Sscanf(h.Date, "%d-%d-%d", &y, &m, &d); e == nil {
+				holidays[d] = h.Description
+			}
+		}
+	}
+
 	out, err := services.GenerateFromTemplate(services.GenerationInput{
 		Template:   &tmpl,
 		Mappings:   tmpl.CellMappings,
@@ -137,6 +149,7 @@ func (s *Server) GenerateTimesheet(c *gin.Context) {
 		Month:      req.Month,
 		Year:       req.Year,
 		Activities: activities,
+		Holidays:   holidays,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "generation failed: " + err.Error()})
@@ -152,6 +165,21 @@ func (s *Server) GenerateTimesheet(c *gin.Context) {
 
 	c.Header("Content-Disposition", "attachment; filename="+filename)
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", out)
+}
+
+// GetHolidays returns Indonesian public holidays for a month so the frontend
+// grid can gray out and label weekends/holidays.
+func (s *Server) GetHolidays(c *gin.Context) {
+	now := time.Now().In(jakarta())
+	year := queryIntDefault(c, "year", now.Year())
+	month := queryIntDefault(c, "month", int(now.Month()))
+	holidays, err := services.FetchHolidays(year, month)
+	if err != nil {
+		// Non-fatal: return an empty set so the grid still renders.
+		c.JSON(http.StatusOK, []models.Holiday{})
+		return
+	}
+	c.JSON(http.StatusOK, holidays)
 }
 
 func queryIntDefault(c *gin.Context, key string, def int) int {

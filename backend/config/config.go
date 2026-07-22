@@ -66,6 +66,28 @@ func getEnvInt(key string, fallback int) int {
 	return fallback
 }
 
+// sanitizeRPID normalises a WebAuthn Relying Party ID to a bare registrable
+// domain. It strips an accidental scheme, port, path, or a stray trailing
+// slash/backslash (the "example.com\" case), which otherwise makes the browser
+// reject the ceremony with a SecurityError.
+func sanitizeRPID(v string) string {
+	v = strings.TrimSpace(v)
+	v = strings.TrimPrefix(v, "https://")
+	v = strings.TrimPrefix(v, "http://")
+	for _, sep := range []string{"/", "\\", ":", "?"} {
+		if i := strings.Index(v, sep); i >= 0 {
+			v = v[:i]
+		}
+	}
+	return strings.Trim(v, " .\\/")
+}
+
+// sanitizeOrigin trims whitespace and any trailing slash/backslash from an
+// allowed WebAuthn origin so it exactly matches the browser's window.origin.
+func sanitizeOrigin(v string) string {
+	return strings.TrimRight(strings.TrimSpace(v), "/\\")
+}
+
 // Load reads configuration from the environment.
 func Load() *Config {
 	cfg := &Config{
@@ -77,8 +99,8 @@ func Load() *Config {
 		ResetTokenTTL: time.Duration(getEnvInt("RESET_TOKEN_TTL_MINUTES", 60)) * time.Minute,
 
 		RPDisplayName: getEnv("WEBAUTHN_RP_NAME", "Timesheet Portal"),
-		RPID:          getEnv("WEBAUTHN_RP_ID", "localhost"),
-		RPOrigins:     []string{getEnv("WEBAUTHN_RP_ORIGIN", "http://localhost:3000")},
+		RPID:          sanitizeRPID(getEnv("WEBAUTHN_RP_ID", "localhost")),
+		RPOrigins:     []string{sanitizeOrigin(getEnv("WEBAUTHN_RP_ORIGIN", "http://localhost:3000"))},
 
 		SMTPHost: getEnv("SMTP_HOST", "localhost"),
 		SMTPPort: getEnvInt("SMTP_PORT", 1025),

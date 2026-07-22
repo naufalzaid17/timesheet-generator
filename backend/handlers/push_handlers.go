@@ -50,13 +50,35 @@ func (s *Server) Subscribe(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "subscribed"})
 }
 
+// unsubscribeRequest carries the endpoint to remove (optional: empty removes
+// all of the caller's subscriptions).
+type unsubscribeRequest struct {
+	Endpoint string `json:"endpoint"`
+}
+
+// Unsubscribe removes the current user's push subscription(s), turning off the
+// daily reminder for this browser.
+func (s *Server) Unsubscribe(c *gin.Context) {
+	var req unsubscribeRequest
+	_ = c.ShouldBindJSON(&req)
+	q := s.DB.Where("user_id = ?", currentUserID(c))
+	if req.Endpoint != "" {
+		q = q.Where("endpoint = ?", req.Endpoint)
+	}
+	if err := q.Delete(&models.PushSubscription{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "unsubscribed"})
+}
+
 // SendTestPush pushes a test notification to the current user (helps verify the
 // service worker wiring without waiting for 17:00 WIB).
 func (s *Server) SendTestPush(c *gin.Context) {
 	s.Push.SendToUser(currentUserID(c), push.Payload{
 		Title: "Timesheet Portal",
 		Body:  "Waktunya isi timesheet hari ini!",
-		URL:   "/dashboard",
+		URL:   "/activity",
 	})
 	c.JSON(http.StatusOK, gin.H{"message": "test notification dispatched"})
 }

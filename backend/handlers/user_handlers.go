@@ -132,14 +132,22 @@ func (s *Server) UpdateUser(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-// DeleteUser soft-deletes a user (admin only).
+// DeleteUser deactivates a user (admin only). This is a soft action — the
+// account is set inactive but stays in the users list and can be reactivated;
+// it is never hard-deleted, preserving their timesheet history.
 func (s *Server) DeleteUser(c *gin.Context) {
 	id := c.Param("id")
-	if err := s.DB.Delete(&models.User{}, id).Error; err != nil {
+	var user models.User
+	if err := s.DB.First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+	if err := s.DB.Model(&user).Update("is_active", false).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "user deleted"})
+	s.DB.First(&user, id)
+	c.JSON(http.StatusOK, user)
 }
 
 // --- Profile approval flow ---
@@ -173,6 +181,18 @@ func (s *Server) SubmitProfileChange(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, change)
+}
+
+// MyProfileChanges returns the current user's own profile change requests so
+// the profile page can show pending/approved/rejected status.
+func (s *Server) MyProfileChanges(c *gin.Context) {
+	var changes []models.ProfileChangeRequest
+	if err := s.DB.Where("user_id = ?", currentUserID(c)).
+		Order("created_at desc").Find(&changes).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, changes)
 }
 
 // ListProfileChanges returns pending profile change requests (admin only).

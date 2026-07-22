@@ -91,6 +91,7 @@ func registerRoutes(r *gin.Engine, s *handlers.Server) {
 	{
 		authed.GET("/me", s.Me)
 		authed.POST("/profile/change", s.SubmitProfileChange)
+		authed.GET("/profile/changes", s.MyProfileChanges)
 
 		// Passkey registration for the logged-in user.
 		authed.POST("/passkey/register/begin", s.BeginPasskeyRegistration)
@@ -100,6 +101,7 @@ func registerRoutes(r *gin.Engine, s *handlers.Server) {
 		authed.POST("/activities", s.UpsertDailyActivity)
 		authed.GET("/activities", s.ListMonthlyActivities)
 		authed.POST("/timesheet/generate", s.GenerateTimesheet)
+		authed.GET("/holidays", s.GetHolidays)
 
 		// Templates are readable by users (to fill the grid), writable by admins.
 		authed.GET("/templates", s.ListTemplates)
@@ -107,6 +109,7 @@ func registerRoutes(r *gin.Engine, s *handlers.Server) {
 
 		// Web push subscription.
 		authed.POST("/push/subscribe", s.Subscribe)
+		authed.POST("/push/unsubscribe", s.Unsubscribe)
 		authed.POST("/push/test", s.SendTestPush)
 	}
 

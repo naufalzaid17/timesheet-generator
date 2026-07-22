@@ -47,8 +47,8 @@ type User struct {
 	Site     string `gorm:"size:128" json:"site"`
 
 	// Credential relations.
-	Credentials       []WebAuthnCredential `gorm:"constraint:OnDelete:CASCADE" json:"-"`
-	PushSubscriptions []PushSubscription   `gorm:"constraint:OnDelete:CASCADE" json:"-"`
+	Credentials       []WebAuthnCredential   `gorm:"constraint:OnDelete:CASCADE" json:"-"`
+	PushSubscriptions []PushSubscription     `gorm:"constraint:OnDelete:CASCADE" json:"-"`
 	ProfileRequests   []ProfileChangeRequest `gorm:"constraint:OnDelete:CASCADE" json:"-"`
 }
 
@@ -101,8 +101,8 @@ type WebAuthnCredential struct {
 	SignCount       uint32 `json:"-"`
 	CloneWarning    bool   `json:"-"`
 	// Transports is stored as a JSON array of transport strings.
-	Transports datatypes.JSON `json:"-"`
-	FriendlyName string        `gorm:"size:128" json:"friendly_name"`
+	Transports   datatypes.JSON `json:"-"`
+	FriendlyName string         `gorm:"size:128" json:"friendly_name"`
 }
 
 // Template is an admin-uploaded .xlsx timesheet template. Multiple client

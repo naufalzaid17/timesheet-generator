@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 
 	"timesheet-backend/auth"
@@ -132,7 +135,12 @@ func (s *Server) BeginPasskeyRegistration(c *gin.Context) {
 		return
 	}
 
-	options, sessionData, err := s.WebAuthn.BeginRegistration(user)
+	// Request a resident (discoverable) credential so the user can later sign in
+	// without typing a username.
+	options, sessionData, err := s.WebAuthn.BeginRegistration(
+		user,
+		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementPreferred),
+	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -173,26 +181,38 @@ func (s *Server) FinishPasskeyRegistration(c *gin.Context) {
 
 // --- WebAuthn: passwordless login ---
 
-// beginPasskeyLoginRequest carries the username whose passkeys to challenge.
+// beginPasskeyLoginRequest optionally carries a username/email. When empty the
+// ceremony is usernameless (discoverable): the browser offers whatever resident
+// passkey it holds for this site and the user is resolved from the assertion.
 type beginPasskeyLoginRequest struct {
-	Identifier string `json:"identifier" binding:"required"`
+	Identifier string `json:"identifier"`
 }
 
-// BeginPasskeyLogin starts an assertion ceremony for a username/email.
+// BeginPasskeyLogin starts an assertion ceremony. With an identifier it scopes
+// the challenge to that user's credentials; without one it starts a
+// discoverable-credential login so no username is required.
 func (s *Server) BeginPasskeyLogin(c *gin.Context) {
 	var req beginPasskeyLoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
-		return
-	}
+	_ = c.ShouldBindJSON(&req) // identifier is optional
 
-	var user models.User
-	if err := s.DB.Preload("Credentials").Where("username = ? OR email = ?", req.Identifier, req.Identifier).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-		return
-	}
+	var (
+		options     *protocol.CredentialAssertion
+		sessionData *webauthn.SessionData
+		err         error
+	)
 
-	options, sessionData, err := s.WebAuthn.BeginLogin(user)
+	if strings.TrimSpace(req.Identifier) == "" {
+		options, sessionData, err = s.WebAuthn.BeginDiscoverableLogin()
+	} else {
+		var user models.User
+		if e := s.DB.Preload("Credentials").
+			Where("username = ? OR email = ?", req.Identifier, req.Identifier).
+			First(&user).Error; e != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+			return
+		}
+		options, sessionData, err = s.WebAuthn.BeginLogin(user)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -202,7 +222,8 @@ func (s *Server) BeginPasskeyLogin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"session_id": sid, "options": options})
 }
 
-// FinishPasskeyLogin validates the assertion and returns a JWT on success.
+// FinishPasskeyLogin validates the assertion and returns a JWT on success. It
+// handles both the scoped and the usernameless (discoverable) flows.
 func (s *Server) FinishPasskeyLogin(c *gin.Context) {
 	sid := c.Query("session_id")
 	sessionData, ok := s.takeSession(sid)
@@ -211,16 +232,32 @@ func (s *Server) FinishPasskeyLogin(c *gin.Context) {
 		return
 	}
 
-	// The session's user handle identifies the user for the ceremony.
 	var user models.User
-	if err := s.DB.Preload("Credentials").Where("id = ?", decodeUserHandle(sessionData.UserID)).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-		return
-	}
+	var credential *webauthn.Credential
+	var err error
 
-	credential, err := s.WebAuthn.FinishLogin(user, *sessionData, c.Request)
+	if len(sessionData.UserID) == 0 {
+		// Discoverable login: resolve the user from the assertion's user handle.
+		handler := func(_, userHandle []byte) (webauthn.User, error) {
+			if e := s.DB.Preload("Credentials").First(&user, decodeUserHandle(userHandle)).Error; e != nil {
+				return nil, e
+			}
+			return user, nil
+		}
+		credential, err = s.WebAuthn.FinishDiscoverableLogin(handler, *sessionData, c.Request)
+	} else {
+		if e := s.DB.Preload("Credentials").First(&user, decodeUserHandle(sessionData.UserID)).Error; e != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+			return
+		}
+		credential, err = s.WebAuthn.FinishLogin(user, *sessionData, c.Request)
+	}
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if !user.IsActive {
+		c.JSON(http.StatusForbidden, gin.H{"error": "account is disabled"})
 		return
 	}
 

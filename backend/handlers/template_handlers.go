@@ -80,12 +80,12 @@ func (s *Server) GetTemplateGrid(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
 		return
 	}
-	grid, sheet, err := services.ParseXLSXGrid(tmpl.FileData, tmpl.SheetName)
+	layout, err := services.ParseXLSXLayout(tmpl.FileData, tmpl.SheetName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"sheet_name": sheet, "grid": grid})
+	c.JSON(http.StatusOK, layout)
 }
 
 // saveMappingsRequest replaces the full mapping set for a template.

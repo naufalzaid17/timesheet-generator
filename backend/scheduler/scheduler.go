@@ -75,7 +75,7 @@ func (s *Scheduler) sendDailyReminders() {
 		s.push.SendToUser(u.ID, push.Payload{
 			Title: "Timesheet Reminder",
 			Body:  "Waktunya isi timesheet hari ini!",
-			URL:   "/dashboard",
+			URL:   "/activity",
 		})
 	}
 }

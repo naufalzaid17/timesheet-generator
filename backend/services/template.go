@@ -30,6 +30,82 @@ func ParseXLSXGrid(data []byte, sheetName string) (grid [][]string, resolvedShee
 	return rows, sheetName, nil
 }
 
+// MergeRegion is a merged-cell region expressed in 0-based Handsontable
+// coordinates with spans.
+type MergeRegion struct {
+	Row     int `json:"row"`
+	Col     int `json:"col"`
+	Rowspan int `json:"rowspan"`
+	Colspan int `json:"colspan"`
+}
+
+// SheetLayout is a faithful-enough rendering of a template sheet for the admin
+// mapping grid: values plus the merged-cell regions and column widths that
+// define the layout. Cell styles and embedded images are NOT reproduced here —
+// they don't affect mapping — but they ARE preserved in generated output, which
+// injects data into a copy of the original uploaded file.
+type SheetLayout struct {
+	SheetName string        `json:"sheet_name"`
+	Grid      [][]string    `json:"grid"`
+	Merges    []MergeRegion `json:"merges"`
+	ColWidths []int         `json:"col_widths"` // pixels, per column
+}
+
+// ParseXLSXLayout parses a template sheet into a SheetLayout, preserving merged
+// regions and column widths so the Handsontable preview resembles the original.
+func ParseXLSXLayout(data []byte, sheetName string) (*SheetLayout, error) {
+	f, err := excelize.OpenReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	if sheetName == "" {
+		sheetName = f.GetSheetName(0)
+	}
+	rows, err := f.GetRows(sheetName)
+	if err != nil {
+		return nil, err
+	}
+
+	layout := &SheetLayout{SheetName: sheetName, Grid: rows}
+
+	// Merged cells.
+	if merges, err := f.GetMergeCells(sheetName); err == nil {
+		for _, m := range merges {
+			sc, sr, e1 := excelize.CellNameToCoordinates(m.GetStartAxis())
+			ec, er, e2 := excelize.CellNameToCoordinates(m.GetEndAxis())
+			if e1 != nil || e2 != nil {
+				continue
+			}
+			layout.Merges = append(layout.Merges, MergeRegion{
+				Row:     sr - 1,
+				Col:     sc - 1,
+				Rowspan: er - sr + 1,
+				Colspan: ec - sc + 1,
+			})
+		}
+	}
+
+	// Column widths (convert Excel character-width units to approx pixels).
+	maxCols := 0
+	for _, r := range rows {
+		if len(r) > maxCols {
+			maxCols = len(r)
+		}
+	}
+	for col := 1; col <= maxCols; col++ {
+		name, _ := excelize.ColumnNumberToName(col)
+		w, err := f.GetColWidth(sheetName, name)
+		if err != nil || w <= 0 {
+			w = 8.43 // Excel default
+		}
+		layout.ColWidths = append(layout.ColWidths, int(w*7)+8)
+	}
+
+	return layout, nil
+}
+
 // generationInput bundles everything needed to render a user's monthly file.
 type GenerationInput struct {
 	Template   *models.Template
@@ -38,6 +114,8 @@ type GenerationInput struct {
 	Month      int
 	Year       int
 	Activities []models.DailyActivity
+	// Holidays maps day-of-month to a public-holiday name for the month.
+	Holidays map[int]string
 }
 
 // GenerateFromTemplate injects a user's stored activities into the admin-mapped
@@ -110,7 +188,10 @@ func GenerateFromTemplate(in GenerationInput) ([]byte, error) {
 				continue
 			}
 			act, ok := byDay[day]
-			value := dailyValue(m.Field, act, ok, in.Year, in.Month, day)
+			date := time.Date(in.Year, time.Month(in.Month), day, 0, 0, 0, 0, time.UTC)
+			isWeekend := date.Weekday() == time.Saturday || date.Weekday() == time.Sunday
+			holiday := in.Holidays[day]
+			value := dailyValue(m.Field, act, ok, in.Year, in.Month, day, isWeekend, holiday)
 			if err := f.SetCellValue(sheet, cell, value); err != nil {
 				return nil, fmt.Errorf("set daily cell %s: %w", cell, err)
 			}
@@ -143,13 +224,26 @@ func metaValue(field models.MappingFieldType, in GenerationInput) string {
 	return ""
 }
 
-// dailyValue resolves a per-day column value for a given field and day.
-func dailyValue(field models.MappingFieldType, act models.DailyActivity, hasActivity bool, year, month, day int) interface{} {
+// dailyValue resolves a per-day column value for a given field and day. When a
+// day has no user activity but is a weekend or public holiday, the status and
+// activity cells are marked so the generated sheet reflects non-working days.
+func dailyValue(field models.MappingFieldType, act models.DailyActivity, hasActivity bool, year, month, day int, isWeekend bool, holiday string) interface{} {
 	switch field {
 	case models.FieldDate:
 		return fmt.Sprintf("%04d-%02d-%02d", year, month, day)
 	}
 	if !hasActivity {
+		if isWeekend || holiday != "" {
+			switch field {
+			case models.FieldStatus:
+				return "X"
+			case models.FieldActivity:
+				if holiday != "" {
+					return holiday
+				}
+				return "Weekend"
+			}
+		}
 		return ""
 	}
 	switch field {
