@@ -126,6 +126,8 @@
 .ht-mapped-col { background-color: rgba(250, 204, 0, 0.30) !important; }
 .ht-day-col { background-color: var(--bg-surface-secondary) !important; font-weight: 800; }
 .ht-locked { background-color: var(--bg-surface-secondary) !important; color: var(--text-muted) !important; }
+.ht-weekend { background-color: rgba(100, 116, 139, 0.18) !important; color: var(--text-muted) !important; }
+.ht-holiday { background-color: rgba(255, 77, 80, 0.20) !important; color: var(--danger-fg) !important; font-weight: 700; }
 [data-theme="dark"] .handsontable td,
 [data-theme="dark"] .handsontable th { border-color: #3A3D48 !important; }
 

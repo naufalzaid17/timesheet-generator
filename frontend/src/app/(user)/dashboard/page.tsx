@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   Download,
   Bell,
-  BellRing,
+  BellOff,
   Fingerprint,
   Loader2,
   CalendarRange,
@@ -14,9 +15,13 @@ import {
 import { api, downloadFile } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
-import { enablePush, pushSupported, registerServiceWorker } from "@/lib/push";
+import {
+  enablePush,
+  disablePush,
+  pushSupported,
+  registerServiceWorker,
+} from "@/lib/push";
 import { registerPasskey, passkeysSupported } from "@/lib/webauthn";
-import DailyModal from "@/components/DailyModal";
 import type { DailyActivity, Template } from "@/lib/types";
 
 const HotGrid = dynamic(() => import("@/components/HotGrid"), { ssr: false });
@@ -46,13 +51,14 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { notify } = useToast();
 
+  const router = useRouter();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1); // 1-based
   const [activities, setActivities] = useState<DailyActivity[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [holidays, setHolidays] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushOn, setPushOn] = useState(false);
@@ -71,12 +77,21 @@ export default function DashboardPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [acts, tmpls] = await Promise.all([
+      const [acts, tmpls, hols] = await Promise.all([
         api<DailyActivity[]>(`/api/activities?year=${year}&month=${month}`),
         api<Template[]>("/api/templates").catch(() => []),
+        api<{ date: string; description: string }[]>(
+          `/api/holidays?year=${year}&month=${month}`
+        ).catch(() => []),
       ]);
       setActivities(acts || []);
       setTemplates(tmpls || []);
+      const hmap: Record<number, string> = {};
+      (hols || []).forEach((h) => {
+        const d = parseInt(h.date.split("-")[2], 10);
+        if (!Number.isNaN(d)) hmap[d] = h.description;
+      });
+      setHolidays(hmap);
     } catch (err: any) {
       notify(err.message, "error");
     } finally {
@@ -108,16 +123,26 @@ export default function DashboardPage() {
   }, [activities]);
 
   const gridData = useMemo(() => {
+    const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const activityIdx = GRID_COLUMNS.findIndex((c) => c.field === "activity");
+    const statusIdx = GRID_COLUMNS.findIndex((c) => c.field === "status");
     const rows: any[][] = [];
     for (let day = 1; day <= totalDays; day++) {
+      const date = new Date(year, month - 1, day);
+      const dow = date.getDay();
+      const isWeekend = dow === 0 || dow === 6;
+      const holiday = holidays[day];
       const act = byDay.get(day);
-      rows.push([
-        `${MONTHS[month - 1].slice(0, 3)} ${day}`,
-        ...GRID_COLUMNS.map((c) => (act ? (act[c.key] as string) || "" : "")),
-      ]);
+      const cols = GRID_COLUMNS.map((c) => (act ? (act[c.key] as string) || "" : ""));
+      // For non-working days without an entry, show the reason as a hint.
+      if (!act && (isWeekend || holiday)) {
+        if (activityIdx >= 0) cols[activityIdx] = holiday || "Weekend";
+        if (statusIdx >= 0) cols[statusIdx] = "X";
+      }
+      rows.push([`${MONTHS[month - 1].slice(0, 3)} ${day} · ${DOW[dow]}`, ...cols]);
     }
     return rows;
-  }, [totalDays, byDay, month]);
+  }, [totalDays, byDay, month, year, holidays]);
 
   const colHeaders = useMemo(
     () => ["Day", ...GRID_COLUMNS.map((c) => c.label)],
@@ -126,13 +151,26 @@ export default function DashboardPage() {
 
   // Only mapped-fillable columns are editable; the Day column is always locked.
   const cells = useCallback(
-    (_row: number, col: number) => {
-      if (col === 0) return { readOnly: true, className: "ht-day-col" };
+    (row: number, col: number) => {
+      const day = row + 1;
+      const date = new Date(year, month - 1, day);
+      const dow = date.getDay();
+      const holiday = holidays[day];
+      const nonWorking = dow === 0 || dow === 6 || !!holiday;
+      const nonWorkingClass = holiday ? "ht-holiday" : "ht-weekend";
+
+      if (col === 0) {
+        return { readOnly: true, className: nonWorking ? nonWorkingClass : "ht-day-col" };
+      }
+      if (nonWorking) {
+        // Weekends and holidays are non-editable and visually flagged.
+        return { readOnly: true, className: nonWorkingClass };
+      }
       const column = GRID_COLUMNS[col - 1];
       const editable = fillableFields.size === 0 || fillableFields.has(column.field);
       return { readOnly: !editable, className: editable ? "" : "ht-locked" };
     },
-    [fillableFields]
+    [fillableFields, holidays, year, month]
   );
 
   // Persist grid edits back to the backend (upsert per day).
@@ -183,14 +221,20 @@ export default function DashboardPage() {
     }
   };
 
-  const handleEnablePush = async () => {
+  const handleTogglePush = async () => {
     setPushBusy(true);
     try {
-      await enablePush();
-      setPushOn(true);
-      notify("Daily reminders enabled at 17:00 WIB 🔔", "success");
+      if (pushOn) {
+        await disablePush();
+        setPushOn(false);
+        notify("Daily reminders turned off", "info");
+      } else {
+        await enablePush();
+        setPushOn(true);
+        notify("Daily reminders enabled at 17:00 WIB", "success");
+      }
     } catch (err: any) {
-      notify(err.message || "Could not enable push", "error");
+      notify(err.message || "Could not update reminders", "error");
     } finally {
       setPushBusy(false);
     }
@@ -219,7 +263,7 @@ export default function DashboardPage() {
               {filledCount} day{filledCount === 1 ? "" : "s"} filled this month.
             </p>
           </div>
-          <button onClick={() => setShowModal(true)} className="btn-primary">
+          <button onClick={() => router.push("/activity")} className="btn-primary">
             <Plus size={18} /> Today&apos;s Activity
           </button>
         </div>
@@ -228,7 +272,7 @@ export default function DashboardPage() {
       {/* Action row */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => router.push("/activity")}
           className="card flex items-center gap-3 p-4 text-left transition hover:shadow-hard"
         >
           <div className="grid h-10 w-10 place-items-center bg-mr-yellow text-black">
@@ -255,21 +299,21 @@ export default function DashboardPage() {
         </button>
 
         <button
-          onClick={handleEnablePush}
+          onClick={handleTogglePush}
           disabled={pushBusy || !pushSupported()}
           className="card flex items-center gap-3 p-4 text-left transition hover:shadow-hard disabled:opacity-60"
         >
-          <div className="grid h-10 w-10 place-items-center  bg-mr-purple text-white">
+          <div className="grid h-10 w-10 place-items-center bg-mr-purple text-white">
             {pushBusy ? (
               <Loader2 size={18} className="animate-spin" />
             ) : pushOn ? (
-              <BellRing size={18} />
+              <BellOff size={18} />
             ) : (
               <Bell size={18} />
             )}
           </div>
           <div>
-            <p className="text-sm font-bold">{pushOn ? "Reminders on" : "Enable reminders"}</p>
+            <p className="text-sm font-bold">{pushOn ? "Disable reminders" : "Enable reminders"}</p>
             <p className="text-xs text-mr-muted">Daily push at 17:00 WIB</p>
           </div>
         </button>
@@ -342,13 +386,10 @@ export default function DashboardPage() {
           />
         )}
         <p className="mt-3 text-xs text-mr-muted">
-          Only columns your admin marked as fillable are editable. Edits save automatically.
+          Only columns your admin marked as fillable are editable. Weekends and
+          holidays are locked. Edits save automatically.
         </p>
       </div>
-
-      {showModal && (
-        <DailyModal onClose={() => setShowModal(false)} onSaved={load} />
-      )}
     </div>
   );
 }

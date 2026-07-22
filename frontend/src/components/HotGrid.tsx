@@ -21,6 +21,9 @@ export interface HotGridProps {
   readOnly?: boolean;
   height?: number | string;
   colWidths?: number | number[];
+  // Merged-cell regions ({row, col, rowspan, colspan}) to reproduce a template's
+  // layout in the preview.
+  mergeCells?: { row: number; col: number; rowspan: number; colspan: number }[];
 }
 
 const HotGrid = forwardRef<any, HotGridProps>(function HotGrid(props, ref) {
@@ -36,8 +39,9 @@ const HotGrid = forwardRef<any, HotGridProps>(function HotGrid(props, ref) {
       readOnly={props.readOnly}
       height={props.height ?? 460}
       colWidths={props.colWidths}
+      mergeCells={props.mergeCells}
       width="100%"
-      stretchH="all"
+      stretchH={props.mergeCells ? "none" : "all"}
       manualColumnResize
       licenseKey="non-commercial-and-evaluation"
       className="ht-mr"

@@ -9,6 +9,29 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { loginWithPasskey, passkeysSupported } from "@/lib/webauthn";
 import { api, getToken } from "@/lib/api";
 
+// friendlyAuthError maps raw backend/browser errors to a message that's safe
+// and useful to show a user, instead of surfacing the raw response text.
+function friendlyAuthError(err: any, context: "password" | "passkey"): string {
+  const raw = (err?.message || "").toLowerCase();
+  if (err?.name === "NotAllowedError" || raw.includes("timed out") || raw.includes("not allowed")) {
+    return "Passkey sign-in was cancelled or timed out. Please try again.";
+  }
+  if (raw.includes("failed to fetch") || raw.includes("networkerror") || raw.includes("load failed")) {
+    return "Can't reach the server. Check your connection and try again.";
+  }
+  if (raw.includes("disabled")) {
+    return "Your account has been deactivated. Please contact your administrator.";
+  }
+  if (raw.includes("invalid credentials") || raw.includes("unauthorized")) {
+    return context === "passkey"
+      ? "No matching passkey was found for this device."
+      : "Incorrect username/email or password.";
+  }
+  return context === "passkey"
+    ? "Couldn't sign in with a passkey. Try your password instead."
+    : "Sign-in failed. Please try again.";
+}
+
 // The sole entry point to the portal. There is NO public sign-up — accounts are
 // created by admins. This page offers password login, passkey login, and the
 // forgot-password flow.
@@ -34,26 +57,24 @@ export default function LoginPage() {
       notify(`Welcome back, ${user.name || user.username}!`, "success");
       routeForRole(user.role);
     } catch (err: any) {
-      notify(err.message || "Login failed", "error");
+      notify(friendlyAuthError(err, "password"), "error");
     } finally {
       setBusy(false);
     }
   };
 
   const handlePasskeyLogin = async () => {
-    if (!identifier) {
-      notify("Enter your username or email first", "info");
-      return;
-    }
     setBusy(true);
     try {
+      // Usernameless: an identifier is optional. If the user typed one we scope
+      // to it, otherwise the browser offers its resident passkeys.
       const user = await loginWithPasskey(identifier);
       // loginWithPasskey already persisted the JWT; sync the auth context user.
       loginWithToken(getToken() || "", user);
       notify("Signed in with passkey", "success");
       routeForRole(user.role);
     } catch (err: any) {
-      notify(err.message || "Passkey login failed", "error");
+      notify(friendlyAuthError(err, "passkey"), "error");
     } finally {
       setBusy(false);
     }

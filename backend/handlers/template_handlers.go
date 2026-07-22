@@ -138,6 +138,23 @@ func (s *Server) SaveTemplateMappings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"mappings": saved})
 }
 
+// SetDefaultTemplate marks a template as the default used for generation when a
+// user doesn't pick one (admin only). Clears the flag on all others first.
+func (s *Server) SetDefaultTemplate(c *gin.Context) {
+	id := c.Param("id")
+	var tmpl models.Template
+	if err := s.DB.First(&tmpl, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+		return
+	}
+	s.DB.Model(&models.Template{}).Where("is_default = ?", true).Update("is_default", false)
+	if err := s.DB.Model(&tmpl).Update("is_default", true).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "default template set"})
+}
+
 // DeleteTemplate removes a template and its mappings (admin only).
 func (s *Server) DeleteTemplate(c *gin.Context) {
 	id := c.Param("id")

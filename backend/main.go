@@ -127,6 +127,7 @@ func registerRoutes(r *gin.Engine, s *handlers.Server) {
 
 		admin.POST("/templates", s.UploadTemplate)
 		admin.POST("/templates/:id/mappings", s.SaveTemplateMappings)
+		admin.POST("/templates/:id/default", s.SetDefaultTemplate)
 		admin.DELETE("/templates/:id", s.DeleteTemplate)
 	}
 }

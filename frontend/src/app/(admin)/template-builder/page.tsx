@@ -9,6 +9,7 @@ import {
   Trash2,
   MousePointerClick,
   Tag,
+  Star,
 } from "lucide-react";
 import { api, API_BASE, getToken } from "@/lib/api";
 import { useToast } from "@/components/Toast";
@@ -51,6 +52,10 @@ export default function TemplateBuilderPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [grid, setGrid] = useState<any[][]>([]);
+  const [merges, setMerges] = useState<
+    { row: number; col: number; rowspan: number; colspan: number }[]
+  >([]);
+  const [colWidths, setColWidths] = useState<number[] | undefined>(undefined);
   const [mappings, setMappings] = useState<CellMapping[]>([]);
   const [selection, setSelection] = useState<{ row: number; col: number } | null>(null);
   const [field, setField] = useState<MappingField>("date");
@@ -80,10 +85,16 @@ export default function TemplateBuilderPage() {
       setLoadingGrid(true);
       try {
         const [gridRes, tmpl] = await Promise.all([
-          api<{ grid: any[][] }>(`/api/templates/${activeId}/grid`),
+          api<{
+            grid: any[][];
+            merges?: { row: number; col: number; rowspan: number; colspan: number }[];
+            col_widths?: number[];
+          }>(`/api/templates/${activeId}/grid`),
           api<Template[]>("/api/templates").then((all) => all.find((t) => t.id === activeId)),
         ]);
         setGrid(gridRes.grid || []);
+        setMerges(gridRes.merges || []);
+        setColWidths(gridRes.col_widths);
         setMappings(tmpl?.cell_mappings || []);
       } catch (err: any) {
         notify(err.message, "error");
@@ -237,6 +248,48 @@ export default function TemplateBuilderPage() {
         </div>
       )}
 
+      {/* Active template management */}
+      {activeId !== null && templates.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {!templates.find((t) => t.id === activeId)?.is_default && (
+            <button
+              onClick={async () => {
+                try {
+                  await api(`/api/admin/templates/${activeId}/default`, {
+                    method: "POST",
+                    body: JSON.stringify({}),
+                  });
+                  notify("Set as default template", "success");
+                  loadTemplates();
+                } catch (err: any) {
+                  notify(err.message, "error");
+                }
+              }}
+              className="btn-ghost text-sm"
+            >
+              <Star size={14} /> Set as default
+            </button>
+          )}
+          <button
+            onClick={async () => {
+              const t = templates.find((x) => x.id === activeId);
+              if (!t || !confirm(`Delete template "${t.name}"? This removes its mapping too.`)) return;
+              try {
+                await api(`/api/admin/templates/${activeId}`, { method: "DELETE" });
+                notify("Template deleted", "success");
+                setActiveId(null);
+                loadTemplates();
+              } catch (err: any) {
+                notify(err.message, "error");
+              }
+            }}
+            className="btn-danger text-sm"
+          >
+            <Trash2 size={14} /> Delete template
+          </button>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-4">
         {/* Grid */}
         <div className="card p-4 lg:col-span-3">
@@ -250,6 +303,8 @@ export default function TemplateBuilderPage() {
               readOnly
               height={520}
               cells={cells}
+              mergeCells={merges.length ? merges : undefined}
+              colWidths={colWidths}
               afterSelectionEnd={(r, c) => setSelection({ row: r, col: c })}
             />
           ) : (

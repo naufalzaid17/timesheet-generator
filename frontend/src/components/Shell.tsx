@@ -10,6 +10,7 @@ import {
   LayoutTemplate,
   LogOut,
   CalendarCheck,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,6 +27,7 @@ const adminNav: NavItem[] = [
 
 const userNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/profile", label: "Profile", icon: UserRound },
 ];
 
 // Shell provides the friendly, rounded sidebar + top bar used by all

@@ -6,7 +6,7 @@ import {
   Loader2,
   Check,
   X,
-  Trash2,
+  Ban,
   ShieldCheck,
   ClipboardList,
 } from "lucide-react";
@@ -81,11 +81,11 @@ export default function UsersPage() {
     }
   };
 
-  const removeUser = async (u: User) => {
-    if (!confirm(`Delete ${u.username}? This cannot be undone.`)) return;
+  const deactivateUser = async (u: User) => {
+    if (!confirm(`Deactivate ${u.username}? They keep their history and can be reactivated later.`)) return;
     try {
       await api(`/api/admin/users/${u.id}`, { method: "DELETE" });
-      notify("User deleted", "success");
+      notify("User deactivated", "success");
       load();
     } catch (err: any) {
       notify(err.message, "error");
@@ -270,13 +270,15 @@ export default function UsersPage() {
                           </button>
                         </td>
                         <td className="py-3 text-right">
-                          <button
-                            onClick={() => removeUser(u)}
-                            className=" p-2 text-mr-muted hover:bg-mr-pink hover:text-white"
-                            title="Delete user"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {u.is_active && (
+                            <button
+                              onClick={() => deactivateUser(u)}
+                              className="border-2 border-mr-ink p-2 text-mr-muted hover:bg-mr-pink hover:text-white"
+                              title="Deactivate user"
+                            >
+                              <Ban size={16} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

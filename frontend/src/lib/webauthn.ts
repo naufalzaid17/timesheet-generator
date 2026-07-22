@@ -62,8 +62,10 @@ export async function registerPasskey(friendlyName = "My device") {
   );
 }
 
-// loginWithPasskey runs an assertion ceremony and returns the authenticated user.
-export async function loginWithPasskey(identifier: string): Promise<User> {
+// loginWithPasskey runs an assertion ceremony and returns the authenticated
+// user. With no identifier it performs a usernameless (discoverable) login —
+// the browser offers whatever resident passkey it holds for this site.
+export async function loginWithPasskey(identifier = ""): Promise<User> {
   const { session_id, options } = await api<{ session_id: string; options: any }>(
     "/api/auth/passkey/login/begin",
     { method: "POST", auth: false, body: JSON.stringify({ identifier }) }

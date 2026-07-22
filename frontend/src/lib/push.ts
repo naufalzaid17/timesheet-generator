@@ -61,3 +61,25 @@ export async function enablePush(): Promise<boolean> {
 export async function sendTestPush() {
   await api("/api/push/test", { method: "POST", body: JSON.stringify({}) });
 }
+
+// disablePush unsubscribes this browser and tells the backend to drop the
+// subscription, turning off the daily reminder.
+export async function disablePush(): Promise<void> {
+  let endpoint = "";
+  if (pushSupported()) {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const sub = await registration.pushManager.getSubscription();
+      if (sub) {
+        endpoint = sub.endpoint;
+        await sub.unsubscribe();
+      }
+    } catch {
+      /* ignore — still tell the backend to drop our subscriptions */
+    }
+  }
+  await api("/api/push/unsubscribe", {
+    method: "POST",
+    body: JSON.stringify({ endpoint }),
+  });
+}
