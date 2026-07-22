@@ -127,6 +127,10 @@ type Template struct {
 	FileData  []byte `gorm:"type:bytea" json:"-"`
 	IsDefault bool   `gorm:"not null;default:false" json:"is_default"`
 	CreatedBy uint   `json:"created_by"`
+	// Builtin, when set (e.g. "bni_dev"), marks a first-class bundled template
+	// whose fixed layout is rendered by a dedicated strict-typed generator rather
+	// than the generic cell-mapping engine.
+	Builtin string `gorm:"size:32" json:"builtin"`
 
 	CellMappings []CellMapping `gorm:"constraint:OnDelete:CASCADE" json:"cell_mappings"`
 }

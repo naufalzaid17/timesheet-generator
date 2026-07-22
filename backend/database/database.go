@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
+	"timesheet-backend/assets"
 	"timesheet-backend/config"
 	"timesheet-backend/models"
 )
@@ -31,7 +32,60 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 	if err := seedAdmin(db, cfg); err != nil {
 		return nil, err
 	}
+	if err := seedDefaultTemplate(db); err != nil {
+		// Non-fatal: the portal still runs, admins can upload a template.
+		log.Printf("[database] could not seed default template: %v", err)
+	}
 	return db, nil
+}
+
+// seedDefaultTemplate installs the bundled BNI DEV timesheet as the default
+// template on first boot (when no template exists yet), along with a
+// representative cell mapping so the admin builder reflects its structure.
+// Generation for this template uses a dedicated strict-typed path keyed off
+// Template.Builtin.
+func seedDefaultTemplate(db *gorm.DB) error {
+	var count int64
+	if err := db.Model(&models.Template{}).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	if len(assets.BNITemplate) == 0 {
+		return nil
+	}
+
+	tmpl := models.Template{
+		Name:        "BNI DEV Timesheet",
+		Description: "Built-in default timesheet template (strict date/time typing + status matrix).",
+		SheetName:   "Sheet1",
+		FileData:    assets.BNITemplate,
+		IsDefault:   true,
+		Builtin:     "bni_dev",
+		CellMappings: []models.CellMapping{
+			// Header metadata (column C, rows 1-6).
+			{Field: models.FieldMetaDivision, Scope: models.ScopeCell, CellRef: "C2", Fillable: false},
+			{Field: models.FieldMetaName, Scope: models.ScopeCell, CellRef: "C3", Fillable: false},
+			{Field: models.FieldMetaMiiID, Scope: models.ScopeCell, CellRef: "C4", Fillable: false},
+			{Field: models.FieldMetaSite, Scope: models.ScopeCell, CellRef: "C5", Fillable: false},
+			{Field: models.FieldMetaMonth, Scope: models.ScopeCell, CellRef: "C6", Fillable: false},
+			// Daily columns, anchored at row 9 (day 1).
+			{Field: models.FieldDate, Scope: models.ScopeDailyColumn, Column: "A", StartRow: 9, Fillable: false},
+			{Field: models.FieldTimeIn, Scope: models.ScopeDailyColumn, Column: "B", StartRow: 9, Fillable: true},
+			{Field: models.FieldTimeOut, Scope: models.ScopeDailyColumn, Column: "C", StartRow: 9, Fillable: true},
+			{Field: models.FieldStatus, Scope: models.ScopeDailyColumn, Column: "E", StartRow: 9, Fillable: true},
+			{Field: models.FieldActivity, Scope: models.ScopeDailyColumn, Column: "K", StartRow: 9, Fillable: true},
+			{Field: models.FieldProjectName, Scope: models.ScopeDailyColumn, Column: "L", StartRow: 9, Fillable: true},
+			{Field: models.FieldProjectID, Scope: models.ScopeDailyColumn, Column: "M", StartRow: 9, Fillable: true},
+			{Field: models.FieldAppImpacted, Scope: models.ScopeDailyColumn, Column: "N", StartRow: 9, Fillable: true},
+		},
+	}
+	if err := db.Create(&tmpl).Error; err != nil {
+		return err
+	}
+	log.Printf("[database] seeded default template '%s' (builtin bni_dev)", tmpl.Name)
+	return nil
 }
 
 // AutoMigrate runs GORM migrations for every entity.
