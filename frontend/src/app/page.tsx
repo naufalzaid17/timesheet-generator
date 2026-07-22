@@ -254,6 +254,14 @@ export default function Home() {
     }));
   };
 
+  // Apply a partial set of fields to many days at once (bulk / multi-select edit)
+  const handleBulkUpdate = (days: number[], updates: Partial<DailyEntryInput>) => {
+    const daySet = new Set(days);
+    setDailyEntries(prev => prev.map(entry =>
+      daySet.has(entry.day) ? { ...entry, ...updates } : entry
+    ));
+  };
+
   // Helper to force 24-hour time format input (HH:mm)
   const handleTimeChange = (day: number, field: "startTime" | "endTime", val: string) => {
     let clean = val.replace(/[^0-9:]/g, "");
@@ -399,6 +407,7 @@ export default function Home() {
         holidays={holidays}
         handleClearAll={handleClearAll}
         handleUpdateEntry={handleUpdateEntry}
+        handleBulkUpdate={handleBulkUpdate}
         handleTimeChange={handleTimeChange}
       />
 
