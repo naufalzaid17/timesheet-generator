@@ -1,5 +1,9 @@
 # Stage 1: Build the static frontend
 FROM node:18-alpine AS frontend-builder
+# Alpine uses musl, but the committed package-lock.json only records the glibc
+# (@next/swc-linux-x64-gnu) SWC binary. libc6-compat provides ld-linux-x86-64.so.2
+# so that binary can load; without it, `next build` fails to load the SWC binary.
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm ci || npm install
