@@ -74,7 +74,7 @@ func ParseXLSXLayout(data []byte, sheetName string) (*SheetLayout, error) {
 		}
 	}
 
-	if dim, err := f.GetDimension(sheetName); err == nil && dim != "" {
+	if dim, err := f.GetSheetDimension(sheetName); err == nil && dim != "" {
 		parts := strings.Split(dim, ":")
 		endAxis := parts[len(parts)-1]
 		if col, row, err := excelize.CellNameToCoordinates(endAxis); err == nil {
