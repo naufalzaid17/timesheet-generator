@@ -14,6 +14,7 @@ import {
   Fingerprint,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
 import type { User, Role, ProfileChangeRequest, Passkey } from "@/lib/types";
 
@@ -21,6 +22,7 @@ import type { User, Role, ProfileChangeRequest, Passkey } from "@/lib/types";
 // reviewing self-service profile change requests.
 export default function UsersPage() {
   const { notify } = useToast();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [changes, setChanges] = useState<ProfileChangeRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -297,11 +299,17 @@ export default function UsersPage() {
                         <td className="py-3">
                           <button
                             onClick={() => toggleActive(u)}
+                            disabled={currentUser?.id === u.id}
+                            title={
+                              currentUser?.id === u.id
+                                ? "You cannot deactivate your own account"
+                                : undefined
+                            }
                             className={`chip ${
                               u.is_active
                                 ? "bg-mr-cyan text-mr-ink"
                                 : "bg-mr-pink text-white"
-                            }`}
+                            } ${currentUser?.id === u.id ? "cursor-not-allowed opacity-60" : ""}`}
                           >
                             {u.is_active ? "Active" : "Disabled"}
                           </button>
@@ -319,7 +327,7 @@ export default function UsersPage() {
                             >
                               <KeyRound size={16} />
                             </button>
-                            {u.is_active && (
+                            {u.is_active && currentUser?.id !== u.id && (
                               <button
                                 onClick={() => deactivateUser(u)}
                                 className="border-2 border-mr-ink p-2 text-mr-muted hover:bg-mr-pink hover:text-white"

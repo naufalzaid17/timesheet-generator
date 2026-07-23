@@ -144,12 +144,21 @@ export default function DailyModal({
               onChange={(e) => set("project_id", e.target.value)}
             />
           </div>
-          <input
-            className="input"
-            placeholder="App impacted"
-            value={form.app_impacted}
-            onChange={(e) => set("app_impacted", e.target.value)}
-          />
+          <div>
+            <label className="mb-1 block text-xs font-semibold">
+              Aplikasi Terdampak
+            </label>
+            <select
+              className="input"
+              value={form.app_impacted}
+              onChange={(e) => set("app_impacted", e.target.value)}
+            >
+              <option value="">— Pilih —</option>
+              <option value="Bisnis">Bisnis</option>
+              <option value="Cash">Cash</option>
+              <option value="Overseas">Overseas</option>
+            </select>
+          </div>
 
           <div className="mt-2 flex justify-end gap-2">
             <button type="button" onClick={onClose} className="btn-ghost">

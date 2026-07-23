@@ -43,6 +43,9 @@ const GRID_COLUMNS: { key: keyof DailyActivity; label: string; field: string }[]
   { key: "app_impacted", label: "App Impacted", field: "app_impacted" },
 ];
 
+// Allowed values for the "Aplikasi Terdampak" (app impacted) column.
+const APP_IMPACTED_OPTIONS = ["Bisnis", "Cash", "Overseas"];
+
 function daysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate();
 }
@@ -168,6 +171,15 @@ export default function DashboardPage() {
       }
       const column = GRID_COLUMNS[col - 1];
       const editable = fillableFields.size === 0 || fillableFields.has(column.field);
+      // Constrain the "Aplikasi Terdampak" column to a fixed dropdown.
+      if (column.field === "app_impacted" && editable) {
+        return {
+          type: "dropdown",
+          source: APP_IMPACTED_OPTIONS,
+          allowInvalid: false,
+          className: "",
+        };
+      }
       return { readOnly: !editable, className: editable ? "" : "ht-locked" };
     },
     [fillableFields, holidays, year, month]

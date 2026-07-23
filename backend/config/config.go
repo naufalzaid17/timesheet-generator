@@ -88,6 +88,28 @@ func sanitizeOrigin(v string) string {
 	return strings.TrimRight(strings.TrimSpace(v), "/\\")
 }
 
+// parseOrigins splits a comma- (or whitespace-) separated list of allowed
+// WebAuthn origins into a clean, de-duplicated slice. This is what enables
+// multi-domain passkeys: a single relying party can accept ceremonies from
+// several fully-qualified origins (e.g. an apex domain plus its www / staging
+// hosts, or several sibling domains served behind Related Origin Requests).
+func parseOrigins(v string) []string {
+	fields := strings.FieldsFunc(v, func(r rune) bool {
+		return r == ',' || r == ' ' || r == '\t' || r == '\n' || r == '\r'
+	})
+	seen := make(map[string]bool, len(fields))
+	origins := make([]string, 0, len(fields))
+	for _, f := range fields {
+		o := sanitizeOrigin(f)
+		if o == "" || seen[o] {
+			continue
+		}
+		seen[o] = true
+		origins = append(origins, o)
+	}
+	return origins
+}
+
 // Load reads configuration from the environment.
 func Load() *Config {
 	cfg := &Config{
@@ -100,7 +122,9 @@ func Load() *Config {
 
 		RPDisplayName: getEnv("WEBAUTHN_RP_NAME", "Timesheet Portal"),
 		RPID:          sanitizeRPID(getEnv("WEBAUTHN_RP_ID", "localhost")),
-		RPOrigins:     []string{sanitizeOrigin(getEnv("WEBAUTHN_RP_ORIGIN", "http://localhost:3000"))},
+		// WEBAUTHN_RP_ORIGIN accepts a comma-separated list so passkeys can be
+		// used across multiple domains/origins under the same relying party.
+		RPOrigins: parseOrigins(getEnv("WEBAUTHN_RP_ORIGIN", "http://localhost:3000")),
 
 		SMTPHost: getEnv("SMTP_HOST", "localhost"),
 		SMTPPort: getEnvInt("SMTP_PORT", 1025),

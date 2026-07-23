@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -9,6 +10,15 @@ import (
 	"timesheet-backend/auth"
 	"timesheet-backend/models"
 )
+
+// isSelf reports whether the :id path param refers to the authenticated caller.
+func isSelf(c *gin.Context, id string) bool {
+	target, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		return false
+	}
+	return uint(target) == currentUserID(c)
+}
 
 // createUserRequest is the admin-only account creation payload.
 type createUserRequest struct {
@@ -53,6 +63,12 @@ func (s *Server) CreateUser(c *gin.Context) {
 		IsActive: true,
 	}
 	if req.Password != "" {
+		// Enforce the NIST SP 800-63B policy on any admin-supplied initial
+		// password (length + blocklist + context-specific terms).
+		if err := auth.ValidatePassword(req.Password, req.Username, req.Email); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		hash, err := auth.HashPassword(req.Password)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not hash password"})
@@ -74,7 +90,7 @@ func (s *Server) CreateUser(c *gin.Context) {
 			TokenHash: hash,
 			ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		})
-		link := s.Cfg.FrontendURL + "/reset-password?token=" + raw
+		link := s.publicBaseURL(c) + "/reset-password?token=" + raw
 		_ = s.Mailer.SendSetupEmail(user.Email, user.Username, link)
 	}
 
@@ -106,6 +122,20 @@ func (s *Server) UpdateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// An admin may never deactivate or demote their own account through the
+	// update path either — both are self-lockout vectors.
+	if isSelf(c, id) {
+		if req.IsActive != nil && !*req.IsActive {
+			c.JSON(http.StatusForbidden, gin.H{"error": "you cannot deactivate your own account"})
+			return
+		}
+		if req.Role != nil && *req.Role != models.RoleAdmin {
+			c.JSON(http.StatusForbidden, gin.H{"error": "you cannot remove your own admin role"})
+			return
+		}
+	}
+
 	updates := map[string]interface{}{}
 	if req.Role != nil {
 		updates["role"] = *req.Role
@@ -137,6 +167,12 @@ func (s *Server) UpdateUser(c *gin.Context) {
 // it is never hard-deleted, preserving their timesheet history.
 func (s *Server) DeleteUser(c *gin.Context) {
 	id := c.Param("id")
+	// An admin may never deactivate/delete their own account — doing so could
+	// lock the last administrator out of the portal.
+	if isSelf(c, id) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "you cannot deactivate your own account"})
+		return
+	}
 	var user models.User
 	if err := s.DB.First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})

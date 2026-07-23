@@ -1,16 +1,14 @@
 package database
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"log"
 
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
 	"timesheet-backend/assets"
+	"timesheet-backend/auth"
 	"timesheet-backend/config"
 	"timesheet-backend/models"
 )
@@ -39,10 +37,11 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 	return db, nil
 }
 
-// seedDefaultTemplate installs the bundled BNI DEV timesheet as the default
-// template on first boot (when no template exists yet), along with a
-// representative cell mapping so the admin builder reflects its structure.
-// Generation for this template uses a dedicated strict-typed path keyed off
+// seedDefaultTemplate installs the two bundled company templates on first boot
+// (when no template exists yet): the MII timesheet as the default, and the
+// BNI DEV timesheet as a second, non-default template. Each ships with a
+// representative cell mapping so the admin builder reflects its structure;
+// generation for both uses a dedicated strict-typed path keyed off
 // Template.Builtin.
 func seedDefaultTemplate(db *gorm.DB) error {
 	var count int64
@@ -52,39 +51,77 @@ func seedDefaultTemplate(db *gorm.DB) error {
 	if count > 0 {
 		return nil
 	}
-	if len(assets.BNITemplate) == 0 {
-		return nil
+
+	// MII timesheet — the default template.
+	if len(assets.MIITemplate) > 0 {
+		mii := models.Template{
+			Name:        "MII Timesheet",
+			Description: "Built-in default MII timesheet template (working hours, total-hour column, status matrix, and hardcoded project/division/department metadata).",
+			SheetName:   "Sheet1",
+			FileData:    assets.MIITemplate,
+			IsDefault:   true,
+			Builtin:     "mii",
+			CellMappings: []models.CellMapping{
+				// Header metadata (column C). C1 (project name) is hardcoded.
+				{Field: models.FieldMetaDivision, Scope: models.ScopeCell, CellRef: "C2", Fillable: false},
+				{Field: models.FieldMetaName, Scope: models.ScopeCell, CellRef: "C3", Fillable: false},
+				{Field: models.FieldMetaMiiID, Scope: models.ScopeCell, CellRef: "C4", Fillable: false},
+				{Field: models.FieldMetaSite, Scope: models.ScopeCell, CellRef: "C5", Fillable: false},
+				{Field: models.FieldMetaMonth, Scope: models.ScopeCell, CellRef: "C6", Fillable: false},
+				// Daily columns, anchored at row 9 (day 1).
+				{Field: models.FieldDate, Scope: models.ScopeDailyColumn, Column: "A", StartRow: 9, Fillable: false},
+				{Field: models.FieldTimeIn, Scope: models.ScopeDailyColumn, Column: "B", StartRow: 9, Fillable: true},
+				{Field: models.FieldTimeOut, Scope: models.ScopeDailyColumn, Column: "C", StartRow: 9, Fillable: true},
+				{Field: models.FieldTotalHour, Scope: models.ScopeDailyColumn, Column: "D", StartRow: 9, Fillable: false},
+				{Field: models.FieldStatus, Scope: models.ScopeDailyColumn, Column: "E", StartRow: 9, Fillable: true},
+				{Field: models.FieldActivity, Scope: models.ScopeDailyColumn, Column: "K", StartRow: 9, Fillable: true},
+				{Field: models.FieldProjectName, Scope: models.ScopeDailyColumn, Column: "L", StartRow: 9, Fillable: false},
+				{Field: models.FieldProjectID, Scope: models.ScopeDailyColumn, Column: "M", StartRow: 9, Fillable: false},
+				{Field: models.FieldAppImpacted, Scope: models.ScopeDailyColumn, Column: "N", StartRow: 9, Fillable: true},
+				{Field: models.FieldAIPFitur, Scope: models.ScopeDailyColumn, Column: "O", StartRow: 9, Fillable: false},
+				{Field: models.FieldDivision, Scope: models.ScopeDailyColumn, Column: "P", StartRow: 9, Fillable: false},
+				{Field: models.FieldDepartment, Scope: models.ScopeDailyColumn, Column: "Q", StartRow: 9, Fillable: false},
+				{Field: models.FieldSubDept, Scope: models.ScopeDailyColumn, Column: "R", StartRow: 9, Fillable: false},
+			},
+		}
+		if err := db.Create(&mii).Error; err != nil {
+			return err
+		}
+		log.Printf("[database] seeded default template '%s' (builtin mii)", mii.Name)
 	}
 
-	tmpl := models.Template{
-		Name:        "BNI DEV Timesheet",
-		Description: "Built-in default timesheet template (strict date/time typing + status matrix).",
-		SheetName:   "Sheet1",
-		FileData:    assets.BNITemplate,
-		IsDefault:   true,
-		Builtin:     "bni_dev",
-		CellMappings: []models.CellMapping{
-			// Header metadata (column C, rows 1-6).
-			{Field: models.FieldMetaDivision, Scope: models.ScopeCell, CellRef: "C2", Fillable: false},
-			{Field: models.FieldMetaName, Scope: models.ScopeCell, CellRef: "C3", Fillable: false},
-			{Field: models.FieldMetaMiiID, Scope: models.ScopeCell, CellRef: "C4", Fillable: false},
-			{Field: models.FieldMetaSite, Scope: models.ScopeCell, CellRef: "C5", Fillable: false},
-			{Field: models.FieldMetaMonth, Scope: models.ScopeCell, CellRef: "C6", Fillable: false},
-			// Daily columns, anchored at row 9 (day 1).
-			{Field: models.FieldDate, Scope: models.ScopeDailyColumn, Column: "A", StartRow: 9, Fillable: false},
-			{Field: models.FieldTimeIn, Scope: models.ScopeDailyColumn, Column: "B", StartRow: 9, Fillable: true},
-			{Field: models.FieldTimeOut, Scope: models.ScopeDailyColumn, Column: "C", StartRow: 9, Fillable: true},
-			{Field: models.FieldStatus, Scope: models.ScopeDailyColumn, Column: "E", StartRow: 9, Fillable: true},
-			{Field: models.FieldActivity, Scope: models.ScopeDailyColumn, Column: "K", StartRow: 9, Fillable: true},
-			{Field: models.FieldProjectName, Scope: models.ScopeDailyColumn, Column: "L", StartRow: 9, Fillable: true},
-			{Field: models.FieldProjectID, Scope: models.ScopeDailyColumn, Column: "M", StartRow: 9, Fillable: true},
-			{Field: models.FieldAppImpacted, Scope: models.ScopeDailyColumn, Column: "N", StartRow: 9, Fillable: true},
-		},
+	// BNI DEV timesheet — the second company's template (non-default).
+	if len(assets.BNITemplate) > 0 {
+		bni := models.Template{
+			Name:        "BNI DEV Timesheet",
+			Description: "Built-in BNI DEV timesheet template (strict date/time typing + status matrix).",
+			SheetName:   "Sheet1",
+			FileData:    assets.BNITemplate,
+			IsDefault:   false,
+			Builtin:     "bni_dev",
+			CellMappings: []models.CellMapping{
+				// Header metadata (column C, rows 1-6).
+				{Field: models.FieldMetaDivision, Scope: models.ScopeCell, CellRef: "C2", Fillable: false},
+				{Field: models.FieldMetaName, Scope: models.ScopeCell, CellRef: "C3", Fillable: false},
+				{Field: models.FieldMetaMiiID, Scope: models.ScopeCell, CellRef: "C4", Fillable: false},
+				{Field: models.FieldMetaSite, Scope: models.ScopeCell, CellRef: "C5", Fillable: false},
+				{Field: models.FieldMetaMonth, Scope: models.ScopeCell, CellRef: "C6", Fillable: false},
+				// Daily columns, anchored at row 9 (day 1).
+				{Field: models.FieldDate, Scope: models.ScopeDailyColumn, Column: "A", StartRow: 9, Fillable: false},
+				{Field: models.FieldTimeIn, Scope: models.ScopeDailyColumn, Column: "B", StartRow: 9, Fillable: true},
+				{Field: models.FieldTimeOut, Scope: models.ScopeDailyColumn, Column: "C", StartRow: 9, Fillable: true},
+				{Field: models.FieldStatus, Scope: models.ScopeDailyColumn, Column: "E", StartRow: 9, Fillable: true},
+				{Field: models.FieldActivity, Scope: models.ScopeDailyColumn, Column: "K", StartRow: 9, Fillable: true},
+				{Field: models.FieldProjectName, Scope: models.ScopeDailyColumn, Column: "L", StartRow: 9, Fillable: true},
+				{Field: models.FieldProjectID, Scope: models.ScopeDailyColumn, Column: "M", StartRow: 9, Fillable: true},
+				{Field: models.FieldAppImpacted, Scope: models.ScopeDailyColumn, Column: "N", StartRow: 9, Fillable: true},
+			},
+		}
+		if err := db.Create(&bni).Error; err != nil {
+			return err
+		}
+		log.Printf("[database] seeded template '%s' (builtin bni_dev)", bni.Name)
 	}
-	if err := db.Create(&tmpl).Error; err != nil {
-		return err
-	}
-	log.Printf("[database] seeded default template '%s' (builtin bni_dev)", tmpl.Name)
 	return nil
 }
 
@@ -115,16 +152,24 @@ func seedAdmin(db *gorm.DB, cfg *config.Config) error {
 	}
 
 	// Never seed a known/guessable admin password. When BOOTSTRAP_ADMIN_PASSWORD
-	// is not explicitly provided, generate a strong random one and print it once
-	// so an operator can capture it from the logs and rotate it.
+	// is not explicitly provided, generate a strong, NIST SP 800-63B-compliant
+	// random one and print it once so an operator can capture it from the logs
+	// and rotate it. When it IS provided, validate it against the same policy so
+	// a weak default can never enter the system through the seeder.
 	adminPassword := cfg.AdminPassword
 	generated := false
 	if adminPassword == "" {
-		adminPassword = randomPassword(18)
+		pw, err := auth.GeneratePassword(auth.GeneratedPasswordLength)
+		if err != nil {
+			return err
+		}
+		adminPassword = pw
 		generated = true
+	} else if err := auth.ValidatePassword(adminPassword, cfg.AdminUsername, cfg.AdminEmail); err != nil {
+		log.Fatalf("[database] BOOTSTRAP_ADMIN_PASSWORD rejected by password policy: %v", err)
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
+	hash, err := auth.HashPassword(adminPassword)
 	if err != nil {
 		return err
 	}
@@ -146,14 +191,4 @@ func seedAdmin(db *gorm.DB, cfg *config.Config) error {
 		log.Printf("[database] seeded bootstrap admin '%s' (%s) using BOOTSTRAP_ADMIN_PASSWORD", cfg.AdminUsername, cfg.AdminEmail)
 	}
 	return nil
-}
-
-// randomPassword returns a URL-safe, cryptographically random password.
-func randomPassword(nBytes int) string {
-	b := make([]byte, nBytes)
-	if _, err := rand.Read(b); err != nil {
-		// Fall back is unacceptable for a credential; abort startup instead.
-		log.Fatalf("[database] failed to generate admin password: %v", err)
-	}
-	return base64.RawURLEncoding.EncodeToString(b)
 }

@@ -75,7 +75,8 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       MAIL_FROM: "Timesheet Portal <no-reply@timesheet.local>"
-      # WebAuthn relying party (matches the frontend origin)
+      # WebAuthn relying party (matches the frontend origin). WEBAUTHN_RP_ORIGIN
+      # accepts a comma-separated list to allow passkeys across multiple domains.
       WEBAUTHN_RP_ID: localhost
       WEBAUTHN_RP_ORIGIN: "http://localhost:3000"
       WEBAUTHN_RP_NAME: "Timesheet Portal"

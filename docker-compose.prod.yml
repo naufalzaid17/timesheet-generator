@@ -23,6 +23,9 @@ services:
       MAIL_FROM: "${MAIL_FROM:-Timesheet Portal <no-reply@timesheet.local>}"
       WEBAUTHN_RP_ID: "${WEBAUTHN_RP_ID:-localhost}"
       WEBAUTHN_RP_ORIGIN: "${WEBAUTHN_RP_ORIGIN:-http://localhost:8080}"
+      # Fallback base for setup/reset email links. Behind a reverse proxy the
+      # public origin (X-Forwarded-Proto/Host) is used automatically, so set this
+      # to your public URL for direct (proxy-less) access.
       FRONTEND_URL: "${FRONTEND_URL:-http://localhost:8080}"
       VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY:-}"
       VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY:-}"
