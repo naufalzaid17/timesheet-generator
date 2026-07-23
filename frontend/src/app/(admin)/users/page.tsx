@@ -39,6 +39,7 @@ export default function UsersPage() {
     mii_id: "",
     division: "",
     site: "",
+    company: "MII",
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -197,12 +198,24 @@ export default function UsersPage() {
                 onChange={(e) => setForm({ ...form, site: e.target.value })}
               />
             </div>
-            <input
-              className="input"
-              placeholder="Division"
-              value={form.division}
-              onChange={(e) => setForm({ ...form, division: e.target.value })}
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                className="input"
+                placeholder="Division"
+                value={form.division}
+                onChange={(e) => setForm({ ...form, division: e.target.value })}
+              />
+              <select
+                className="input font-semibold"
+                value={form.company}
+                onChange={(e) => setForm({ ...form, company: e.target.value })}
+              >
+                <option value="MII">Company: MII</option>
+                <option value="SDD">Company: SDD</option>
+                <option value="NTT">Company: NTT</option>
+                <option value="Adidata">Company: Adidata</option>
+              </select>
+            </div>
             <select
               className="input"
               value={form.role}
@@ -271,6 +284,7 @@ export default function UsersPage() {
                   <thead>
                     <tr className="text-xs uppercase text-mr-muted">
                       <th className="pb-2">User</th>
+                      <th className="pb-2">Company</th>
                       <th className="pb-2">Role</th>
                       <th className="pb-2">Status</th>
                       <th className="pb-2 text-right">Actions</th>
@@ -283,6 +297,30 @@ export default function UsersPage() {
                         <td className="py-3">
                           <p className="font-semibold">{u.name || u.username}</p>
                           <p className="text-xs text-mr-muted">{u.email}</p>
+                        </td>
+                        <td className="py-3">
+                          <select
+                            className="input py-1 px-2 text-xs font-bold border-mr-ink/30 bg-mr-surface"
+                            value={u.company || "MII"}
+                            onChange={async (e) => {
+                              const newComp = e.target.value;
+                              try {
+                                await api(`/api/admin/users/${u.id}`, {
+                                  method: "PATCH",
+                                  body: JSON.stringify({ company: newComp }),
+                                });
+                                notify(`Assigned ${u.username} to ${newComp}`, "success");
+                                load();
+                              } catch (err: any) {
+                                notify(err.message, "error");
+                              }
+                            }}
+                          >
+                            <option value="MII">MII</option>
+                            <option value="SDD">SDD</option>
+                            <option value="NTT">NTT</option>
+                            <option value="Adidata">Adidata</option>
+                          </select>
                         </td>
                         <td className="py-3">
                           <span

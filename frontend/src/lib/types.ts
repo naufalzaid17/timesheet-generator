@@ -10,6 +10,7 @@ export interface User {
   mii_id: string;
   division: string;
   site: string;
+  company?: string;
   created_at: string;
 }
 
@@ -47,6 +48,7 @@ export interface Template {
   name: string;
   description: string;
   sheet_name: string;
+  company?: string;
   is_default: boolean;
   cell_mappings: CellMapping[];
   created_at: string;

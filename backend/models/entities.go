@@ -46,6 +46,7 @@ type User struct {
 	MiiID    string `gorm:"size:64" json:"mii_id"`
 	Division string `gorm:"size:255" json:"division"`
 	Site     string `gorm:"size:128" json:"site"`
+	Company  string `gorm:"size:64" json:"company"`
 
 	// Credential relations.
 	Credentials       []WebAuthnCredential   `gorm:"constraint:OnDelete:CASCADE" json:"-"`
@@ -122,6 +123,7 @@ type Template struct {
 
 	Name        string `gorm:"size:255;not null" json:"name"`
 	Description string `gorm:"size:512" json:"description"`
+	Company     string `gorm:"size:64" json:"company"`
 	// SheetName is the worksheet the mapping applies to.
 	SheetName string `gorm:"size:128;not null;default:Sheet1" json:"sheet_name"`
 	// FileData holds the raw .xlsx bytes so generation is self-contained.

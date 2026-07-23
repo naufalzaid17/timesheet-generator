@@ -57,6 +57,7 @@ func (s *Server) UploadTemplate(c *gin.Context) {
 	tmpl := models.Template{
 		Name:        name,
 		Description: c.PostForm("description"),
+		Company:     c.PostForm("company"),
 		SheetName:   sheet,
 		FileData:    data,
 		IsDefault:   c.PostForm("is_default") == "true",

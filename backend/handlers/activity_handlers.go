@@ -112,17 +112,27 @@ func (s *Server) GenerateTimesheet(c *gin.Context) {
 		return
 	}
 
-	// Resolve the template: explicit id, else the default.
+	// Resolve the template: explicit id, else user's assigned company, else default.
 	var tmpl models.Template
-	q := s.DB.Preload("CellMappings")
 	if req.TemplateID != 0 {
-		q = q.Where("id = ?", req.TemplateID)
+		if err := s.DB.Preload("CellMappings").Where("id = ?", req.TemplateID).First(&tmpl).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "template not found"})
+			return
+		}
+	} else if user.Company != "" {
+		// Try matching user's assigned company
+		if err := s.DB.Preload("CellMappings").Where("LOWER(company) = LOWER(?) OR LOWER(name) LIKE LOWER(?) OR LOWER(builtin) = LOWER(?)", user.Company, "%"+user.Company+"%", user.Company).First(&tmpl).Error; err != nil {
+			// Fallback to default template
+			if err := s.DB.Preload("CellMappings").Where("is_default = ?", true).First(&tmpl).Error; err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "no template available for company: " + user.Company})
+				return
+			}
+		}
 	} else {
-		q = q.Where("is_default = ?", true)
-	}
-	if err := q.First(&tmpl).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no template available; ask an admin to upload one"})
-		return
+		if err := s.DB.Preload("CellMappings").Where("is_default = ?", true).First(&tmpl).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no template available; ask an admin to upload one"})
+			return
+		}
 	}
 
 	start := time.Date(req.Year, time.Month(req.Month), 1, 0, 0, 0, 0, jakarta())

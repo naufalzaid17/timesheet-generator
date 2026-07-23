@@ -29,6 +29,7 @@ type createUserRequest struct {
 	MiiID    string      `json:"mii_id"`
 	Division string      `json:"division"`
 	Site     string      `json:"site"`
+	Company  string      `json:"company"`
 	// Password is optional; when omitted the user completes setup via email link.
 	Password string `json:"password"`
 }
@@ -60,6 +61,7 @@ func (s *Server) CreateUser(c *gin.Context) {
 		MiiID:    req.MiiID,
 		Division: req.Division,
 		Site:     req.Site,
+		Company:  req.Company,
 		IsActive: true,
 	}
 	if req.Password != "" {
@@ -105,6 +107,7 @@ type updateUserRequest struct {
 	MiiID    *string      `json:"mii_id"`
 	Division *string      `json:"division"`
 	Site     *string      `json:"site"`
+	Company  *string      `json:"company"`
 }
 
 // UpdateUser edits a user directly (admin only). Admin edits are applied
@@ -154,6 +157,9 @@ func (s *Server) UpdateUser(c *gin.Context) {
 	}
 	if req.Site != nil {
 		updates["site"] = *req.Site
+	}
+	if req.Company != nil {
+		updates["company"] = *req.Company
 	}
 	if len(updates) > 0 {
 		s.DB.Model(&user).Updates(updates)
