@@ -112,7 +112,7 @@ func (s *Server) GenerateTimesheet(c *gin.Context) {
 		return
 	}
 
-	// Resolve the template: explicit id, else user's assigned company, else default.
+	// Resolve the template: explicit id, or strictly by user's assigned company.
 	var tmpl models.Template
 	if req.TemplateID != 0 {
 		if err := s.DB.Preload("CellMappings").Where("id = ?", req.TemplateID).First(&tmpl).Error; err != nil {
@@ -120,19 +120,13 @@ func (s *Server) GenerateTimesheet(c *gin.Context) {
 			return
 		}
 	} else if user.Company != "" {
-		// Try matching user's assigned company
 		if err := s.DB.Preload("CellMappings").Where("LOWER(company) = LOWER(?) OR LOWER(name) LIKE LOWER(?) OR LOWER(builtin) = LOWER(?)", user.Company, "%"+user.Company+"%", user.Company).First(&tmpl).Error; err != nil {
-			// Fallback to default template
-			if err := s.DB.Preload("CellMappings").Where("is_default = ?", true).First(&tmpl).Error; err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "no template available for company: " + user.Company})
-				return
-			}
-		}
-	} else {
-		if err := s.DB.Preload("CellMappings").Where("is_default = ?", true).First(&tmpl).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "no template available; ask an admin to upload one"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no template available for company: " + user.Company + ". Please ask an admin to upload a template for " + user.Company})
 			return
 		}
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user has no company assigned. Ask an admin to assign a company (MII, SDD, NTT, or Adidata) to your account."})
+		return
 	}
 
 	start := time.Date(req.Year, time.Month(req.Month), 1, 0, 0, 0, 0, jakarta())

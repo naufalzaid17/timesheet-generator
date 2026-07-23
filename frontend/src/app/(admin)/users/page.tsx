@@ -39,7 +39,7 @@ export default function UsersPage() {
     mii_id: "",
     division: "",
     site: "",
-    company: "MII",
+    company: "",
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -209,11 +209,13 @@ export default function UsersPage() {
                 className="input font-semibold"
                 value={form.company}
                 onChange={(e) => setForm({ ...form, company: e.target.value })}
+                required
               >
-                <option value="MII">Company: MII</option>
-                <option value="SDD">Company: SDD</option>
-                <option value="NTT">Company: NTT</option>
-                <option value="Adidata">Company: Adidata</option>
+                <option value="">— Select Company —</option>
+                <option value="MII">MII</option>
+                <option value="SDD">SDD</option>
+                <option value="NTT">NTT</option>
+                <option value="Adidata">Adidata</option>
               </select>
             </div>
             <select
@@ -300,8 +302,10 @@ export default function UsersPage() {
                         </td>
                         <td className="py-3">
                           <select
-                            className="input py-1 px-2 text-xs font-bold border-mr-ink/30 bg-mr-surface"
-                            value={u.company || "MII"}
+                            className={`input py-1 px-2 text-xs font-bold border-mr-ink/30 ${
+                              u.company ? "bg-mr-surface" : "bg-amber-100 text-amber-800 border-amber-400"
+                            }`}
+                            value={u.company || ""}
                             onChange={async (e) => {
                               const newComp = e.target.value;
                               try {
@@ -309,13 +313,14 @@ export default function UsersPage() {
                                   method: "PATCH",
                                   body: JSON.stringify({ company: newComp }),
                                 });
-                                notify(`Assigned ${u.username} to ${newComp}`, "success");
+                                notify(`Assigned ${u.username} to ${newComp || "none"}`, "success");
                                 load();
                               } catch (err: any) {
                                 notify(err.message, "error");
                               }
                             }}
                           >
+                            <option value="">— Unassigned —</option>
                             <option value="MII">MII</option>
                             <option value="SDD">SDD</option>
                             <option value="NTT">NTT</option>
