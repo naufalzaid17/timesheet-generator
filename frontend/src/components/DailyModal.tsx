@@ -130,20 +130,7 @@ export default function DailyModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              className="input"
-              placeholder="Project name"
-              value={form.project_name}
-              onChange={(e) => set("project_name", e.target.value)}
-            />
-            <input
-              className="input"
-              placeholder="Project ID"
-              value={form.project_id}
-              onChange={(e) => set("project_id", e.target.value)}
-            />
-          </div>
+
           <div>
             <label className="mb-1 block text-xs font-semibold">
               Aplikasi Terdampak

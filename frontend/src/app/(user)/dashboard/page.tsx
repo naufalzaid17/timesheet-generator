@@ -38,8 +38,6 @@ const GRID_COLUMNS: { key: keyof DailyActivity; label: string; field: string }[]
   { key: "end_time", label: "Time Out", field: "time_out" },
   { key: "status", label: "Status", field: "status" },
   { key: "activity", label: "Activity", field: "activity" },
-  { key: "project_name", label: "Project", field: "project_name" },
-  { key: "project_id", label: "Project ID", field: "project_id" },
   { key: "app_impacted", label: "App Impacted", field: "app_impacted" },
 ];
 
@@ -202,9 +200,9 @@ export default function DashboardPage() {
           end_time: row[2] || "",
           status: row[3] || "",
           activity: row[4] || "",
-          project_name: row[5] || "",
-          project_id: row[6] || "",
-          app_impacted: row[7] || "",
+          project_name: "",
+          project_id: "",
+          app_impacted: row[5] || "",
         };
         try {
           await api("/api/activities", { method: "POST", body: JSON.stringify(payload) });
