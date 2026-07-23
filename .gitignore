@@ -9,6 +9,7 @@ backend/docs/swagger.yaml
 # Next.js build and cache
 .next/
 out/
+next-env.d.ts
 *.tsbuildinfo
 
 # OS/IDE files
