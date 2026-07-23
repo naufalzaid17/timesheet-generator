@@ -15,20 +15,11 @@ import (
 // grid suitable for rendering in Handsontable on the admin template builder.
 // When sheetName is empty the first sheet is used.
 func ParseXLSXGrid(data []byte, sheetName string) (grid [][]string, resolvedSheet string, err error) {
-	f, err := excelize.OpenReader(bytes.NewReader(data))
+	layout, err := ParseXLSXLayout(data, sheetName)
 	if err != nil {
 		return nil, "", err
 	}
-	defer f.Close()
-
-	if sheetName == "" {
-		sheetName = f.GetSheetName(0)
-	}
-	rows, err := f.GetRows(sheetName)
-	if err != nil {
-		return nil, "", err
-	}
-	return rows, sheetName, nil
+	return layout.Grid, layout.SheetName, nil
 }
 
 // MergeRegion is a merged-cell region expressed in 0-based Handsontable
@@ -54,6 +45,8 @@ type SheetLayout struct {
 
 // ParseXLSXLayout parses a template sheet into a SheetLayout, preserving merged
 // regions and column widths so the Handsontable preview resembles the original.
+// All rows are padded into a complete rectangular 2D matrix so every cell in the
+// template grid is rendered and selectable in Handsontable.
 func ParseXLSXLayout(data []byte, sheetName string) (*SheetLayout, error) {
 	f, err := excelize.OpenReader(bytes.NewReader(data))
 	if err != nil {
@@ -69,15 +62,43 @@ func ParseXLSXLayout(data []byte, sheetName string) (*SheetLayout, error) {
 		return nil, err
 	}
 
-	layout := &SheetLayout{SheetName: sheetName, Grid: rows}
+	layout := &SheetLayout{SheetName: sheetName}
 
-	// Merged cells.
+	// Parse merged cells and keep track of max row & col indices.
+	maxCols := 0
+	maxRows := len(rows)
+
+	for _, r := range rows {
+		if len(r) > maxCols {
+			maxCols = len(r)
+		}
+	}
+
+	if dim, err := f.GetDimension(sheetName); err == nil && dim != "" {
+		parts := strings.Split(dim, ":")
+		endAxis := parts[len(parts)-1]
+		if col, row, err := excelize.CellNameToCoordinates(endAxis); err == nil {
+			if col > maxCols {
+				maxCols = col
+			}
+			if row > maxRows {
+				maxRows = row
+			}
+		}
+	}
+
 	if merges, err := f.GetMergeCells(sheetName); err == nil {
 		for _, m := range merges {
 			sc, sr, e1 := excelize.CellNameToCoordinates(m.GetStartAxis())
 			ec, er, e2 := excelize.CellNameToCoordinates(m.GetEndAxis())
 			if e1 != nil || e2 != nil {
 				continue
+			}
+			if ec > maxCols {
+				maxCols = ec
+			}
+			if er > maxRows {
+				maxRows = er
 			}
 			layout.Merges = append(layout.Merges, MergeRegion{
 				Row:     sr - 1,
@@ -88,13 +109,20 @@ func ParseXLSXLayout(data []byte, sheetName string) (*SheetLayout, error) {
 		}
 	}
 
-	// Column widths (convert Excel character-width units to approx pixels).
-	maxCols := 0
-	for _, r := range rows {
-		if len(r) > maxCols {
-			maxCols = len(r)
+	// Build a complete rectangular 2-D matrix (maxRows x maxCols) so no cells are omitted.
+	grid := make([][]string, maxRows)
+	for r := 0; r < maxRows; r++ {
+		rowSlice := make([]string, maxCols)
+		if r < len(rows) {
+			for c := 0; c < len(rows[r]) && c < maxCols; c++ {
+				rowSlice[c] = rows[r][c]
+			}
 		}
+		grid[r] = rowSlice
 	}
+	layout.Grid = grid
+
+	// Column widths (convert Excel character-width units to approx pixels).
 	for col := 1; col <= maxCols; col++ {
 		name, _ := excelize.ColumnNumberToName(col)
 		w, err := f.GetColWidth(sheetName, name)
