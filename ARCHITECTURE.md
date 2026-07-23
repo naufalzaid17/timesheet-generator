@@ -48,8 +48,20 @@ Migrations and the bootstrap-admin seed run in `backend/database/database.go`.
 - **Passkey login** (WebAuthn assertion): `/api/auth/passkey/login/{begin,finish}`
   using `go-webauthn/webauthn`. Registration (`/api/passkey/register/*`) requires
   an existing session, so passkeys are added from the dashboard.
+- **Multi-domain passkeys**: `WEBAUTHN_RP_ORIGIN` accepts a comma-separated list
+  of allowed origins, and `/.well-known/webauthn` serves the WebAuthn *Related
+  Origin Requests* document listing those origins, so one relying party's
+  passkeys work across several domains rather than a single origin.
 - **No public sign-up.** The only account-creation path is admin-only
   `POST /api/admin/users`, which emails a setup link.
+- **Password policy (NIST SP 800-63B)**: `auth.ValidatePassword` enforces an
+  8–64 character length window and a common/context-specific blocklist (no
+  composition rules), applied at admin create-user, self-service reset, and the
+  bootstrap-admin seed. When `BOOTSTRAP_ADMIN_PASSWORD` is unset the seeder
+  generates a strong, policy-compliant password and logs it once.
+- **Admin self-protection**: an admin can never deactivate, delete, or demote
+  their own account (`DELETE`/`PATCH /api/admin/users/:id` reject self-targeting),
+  preventing an accidental last-admin lockout.
 - **Forgot/Reset password**: `/api/auth/forgot-password` issues a hashed,
   time-limited token emailed as a link; `/api/auth/reset-password` consumes it.
 - **Route protection**: `AuthMiddleware` (Bearer JWT) + `AdminOnly` guard the

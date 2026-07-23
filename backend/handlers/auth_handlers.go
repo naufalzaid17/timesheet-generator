@@ -51,6 +51,19 @@ func (s *Server) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": token, "user": user})
 }
 
+// WebAuthnRelatedOrigins serves the WebAuthn "Related Origin Requests"
+// well-known document at /.well-known/webauthn. When a passkey's relying party
+// (RPID) is served across several registrable domains, a browser performing a
+// ceremony on one of those sibling origins fetches this document from the RPID
+// host and allows the ceremony if its origin is listed here. Combined with the
+// multi-value WEBAUTHN_RP_ORIGIN allow-list this is what makes passkeys usable
+// across multiple domains rather than a single one.
+//
+// See: https://w3c.github.io/webauthn/#sctn-related-origins
+func (s *Server) WebAuthnRelatedOrigins(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"origins": s.Cfg.RPOrigins})
+}
+
 // Me returns the currently authenticated user record.
 func (s *Server) Me(c *gin.Context) {
 	var user models.User
@@ -91,7 +104,8 @@ func (s *Server) ForgotPassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "if the email exists, a reset link has been sent"})
 }
 
-// resetRequest completes a password reset.
+// resetRequest completes a password reset. The min length mirrors the NIST
+// policy; ValidatePassword performs the full check (blocklist + context) below.
 type resetRequest struct {
 	Token    string `json:"token" binding:"required"`
 	Password string `json:"password" binding:"required,min=8"`
@@ -109,6 +123,16 @@ func (s *Server) ResetPassword(c *gin.Context) {
 	err := s.DB.Where("token_hash = ? AND used = ? AND expires_at > ?", auth.HashToken(req.Token), false, time.Now()).First(&token).Error
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or expired token"})
+		return
+	}
+
+	// Enforce the NIST SP 800-63B password policy (length + blocklist +
+	// context-specific terms) before accepting the new secret. Look up the
+	// account so its username/email can be treated as context-specific words.
+	var user models.User
+	_ = s.DB.First(&user, token.UserID).Error
+	if err := auth.ValidatePassword(req.Password, user.Username, user.Email); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 

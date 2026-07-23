@@ -1,8 +1,6 @@
 package database
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"log"
 
 	"golang.org/x/crypto/bcrypt"
@@ -11,6 +9,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 
 	"timesheet-backend/assets"
+	"timesheet-backend/auth"
 	"timesheet-backend/config"
 	"timesheet-backend/models"
 )
@@ -115,13 +114,21 @@ func seedAdmin(db *gorm.DB, cfg *config.Config) error {
 	}
 
 	// Never seed a known/guessable admin password. When BOOTSTRAP_ADMIN_PASSWORD
-	// is not explicitly provided, generate a strong random one and print it once
-	// so an operator can capture it from the logs and rotate it.
+	// is not explicitly provided, generate a strong, NIST SP 800-63B-compliant
+	// random one and print it once so an operator can capture it from the logs
+	// and rotate it. When it IS provided, validate it against the same policy so
+	// a weak default can never enter the system through the seeder.
 	adminPassword := cfg.AdminPassword
 	generated := false
 	if adminPassword == "" {
-		adminPassword = randomPassword(18)
+		pw, err := auth.GeneratePassword(auth.GeneratedPasswordLength)
+		if err != nil {
+			return err
+		}
+		adminPassword = pw
 		generated = true
+	} else if err := auth.ValidatePassword(adminPassword, cfg.AdminUsername, cfg.AdminEmail); err != nil {
+		log.Fatalf("[database] BOOTSTRAP_ADMIN_PASSWORD rejected by password policy: %v", err)
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
@@ -146,14 +153,4 @@ func seedAdmin(db *gorm.DB, cfg *config.Config) error {
 		log.Printf("[database] seeded bootstrap admin '%s' (%s) using BOOTSTRAP_ADMIN_PASSWORD", cfg.AdminUsername, cfg.AdminEmail)
 	}
 	return nil
-}
-
-// randomPassword returns a URL-safe, cryptographically random password.
-func randomPassword(nBytes int) string {
-	b := make([]byte, nBytes)
-	if _, err := rand.Read(b); err != nil {
-		// Fall back is unacceptable for a credential; abort startup instead.
-		log.Fatalf("[database] failed to generate admin password: %v", err)
-	}
-	return base64.RawURLEncoding.EncodeToString(b)
 }

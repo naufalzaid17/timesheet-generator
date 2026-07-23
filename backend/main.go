@@ -85,6 +85,11 @@ func registerRoutes(r *gin.Engine, s *handlers.Server) {
 	// Public VAPID key (needed before the user is subscribed).
 	api.GET("/push/vapid-public-key", s.GetVAPIDKey)
 
+	// WebAuthn Related Origin Requests document, served at the well-known path
+	// so passkeys registered under one relying party can be used across the
+	// multiple domains listed in WEBAUTHN_RP_ORIGIN.
+	r.GET("/.well-known/webauthn", s.WebAuthnRelatedOrigins)
+
 	// --- Authenticated routes (any role) ---
 	authed := api.Group("")
 	authed.Use(s.AuthMiddleware())
