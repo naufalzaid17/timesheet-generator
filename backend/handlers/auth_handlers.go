@@ -43,6 +43,15 @@ func (s *Server) Login(c *gin.Context) {
 		return
 	}
 
+	// Opportunistically upgrade legacy/weaker hashes (e.g. bcrypt from before the
+	// Argon2id migration) to the current Argon2id parameters now that we have the
+	// plaintext in hand.
+	if auth.NeedsRehash(user.PasswordHash) {
+		if newHash, herr := auth.HashPassword(req.Password); herr == nil {
+			s.DB.Model(&models.User{}).Where("id = ?", user.ID).Update("password_hash", newHash)
+		}
+	}
+
 	token, err := s.Auth.GenerateToken(&user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not issue token"})
@@ -97,7 +106,7 @@ func (s *Server) ForgotPassword(c *gin.Context) {
 				TokenHash: hash,
 				ExpiresAt: time.Now().Add(s.Cfg.ResetTokenTTL),
 			})
-			link := s.Cfg.FrontendURL + "/reset-password?token=" + raw
+			link := s.publicBaseURL(c) + "/reset-password?token=" + raw
 			_ = s.Mailer.SendResetEmail(user.Email, link)
 		}
 	}

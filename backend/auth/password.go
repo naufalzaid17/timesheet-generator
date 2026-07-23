@@ -14,8 +14,8 @@ const (
 	// user-chosen memorized secret (§5.1.1.2: at least 8 characters).
 	PasswordMinLength = 8
 	// PasswordMaxLength is the maximum a verifier must accept. NIST requires
-	// accepting secrets of at least 64 characters; we cap there to bound bcrypt
-	// input (bcrypt itself only considers the first 72 bytes).
+	// accepting secrets of at least 64 characters; we cap there as a sane upper
+	// bound (Argon2id itself imposes no practical length limit).
 	PasswordMaxLength = 64
 	// GeneratedPasswordLength is the length of an auto-generated default
 	// password. 20 characters from a 64-symbol alphabet is ~120 bits of

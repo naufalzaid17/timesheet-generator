@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 
 	"timesheet-backend/models"
 )
@@ -29,17 +28,6 @@ type Service struct {
 // NewService constructs an auth Service.
 func NewService(secret string, expiry time.Duration) *Service {
 	return &Service{secret: []byte(secret), expiry: expiry}
-}
-
-// HashPassword returns a bcrypt hash for the given plaintext.
-func HashPassword(plain string) (string, error) {
-	b, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.DefaultCost)
-	return string(b), err
-}
-
-// CheckPassword reports whether plain matches the stored bcrypt hash.
-func CheckPassword(hash, plain string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(plain)) == nil
 }
 
 // GenerateToken signs a JWT for the given user.

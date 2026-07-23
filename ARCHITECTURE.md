@@ -43,8 +43,10 @@ Migrations and the bootstrap-admin seed run in `backend/database/database.go`.
 
 ## 2. Authentication & RBAC
 
-- **Password login** (`/api/auth/login`): username **or** email + bcrypt-checked
-  password → signed JWT (`backend/auth`).
+- **Password login** (`/api/auth/login`): username **or** email + password
+  verified against an **Argon2id** hash → signed JWT (`backend/auth`). Hashes are
+  PHC-encoded; legacy bcrypt hashes still verify and are transparently upgraded
+  to Argon2id on the next successful login.
 - **Passkey login** (WebAuthn assertion): `/api/auth/passkey/login/{begin,finish}`
   using `go-webauthn/webauthn`. Registration (`/api/passkey/register/*`) requires
   an existing session, so passkeys are added from the dashboard.
@@ -64,6 +66,10 @@ Migrations and the bootstrap-admin seed run in `backend/database/database.go`.
   preventing an accidental last-admin lockout.
 - **Forgot/Reset password**: `/api/auth/forgot-password` issues a hashed,
   time-limited token emailed as a link; `/api/auth/reset-password` consumes it.
+  Setup/reset links are built from the **public** request origin
+  (`X-Forwarded-Proto`/`X-Forwarded-Host` behind a reverse proxy), falling back
+  to `FRONTEND_URL`, so emailed links open on the real domain rather than a
+  localhost default.
 - **Route protection**: `AuthMiddleware` (Bearer JWT) + `AdminOnly` guard the
   `/api/admin/*` group. The frontend mirrors this with `Guard` on route-group
   layouts.
@@ -85,6 +91,19 @@ Migrations and the bootstrap-admin seed run in `backend/database/database.go`.
      `start_row`; `fillable` decides whether users may edit it.
 4. Mappings are saved atomically (`POST /api/admin/templates/:id/mappings`),
    replacing the prior set. Users can never reach any template-write route.
+
+**Built-in company templates.** Two bundled templates are seeded on first boot,
+each rendered by a dedicated strict-typed generator keyed off `Template.Builtin`
+(`backend/services/template.go`):
+
+- **MII Timesheet** (`builtin=mii`, **default**): working-hours block (`B` start,
+  `C` end), a computed **total-hour** column `D` (`=C-B`), the `E:J` status
+  matrix, activity/remark `K`, a fixed-choice **Aplikasi Terdampak** column `N`
+  (Bisnis / Cash / Overseas), and hardcoded metadata — project `BNI Direct` (`L`),
+  project id `P24015` (`M`), divisi `Wholesale Digital Delivery` (`P`), and
+  departement `Wholesale Channel and Service Delivery` (`Q`).
+- **BNI DEV Timesheet** (`builtin=bni_dev`, non-default): the second company's
+  layout.
 
 ## 4. Daily entry & restricted monthly grid
 

@@ -90,7 +90,7 @@ func (s *Server) CreateUser(c *gin.Context) {
 			TokenHash: hash,
 			ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		})
-		link := s.Cfg.FrontendURL + "/reset-password?token=" + raw
+		link := s.publicBaseURL(c) + "/reset-password?token=" + raw
 		_ = s.Mailer.SendSetupEmail(user.Email, user.Username, link)
 	}
 

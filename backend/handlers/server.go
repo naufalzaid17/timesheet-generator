@@ -112,6 +112,41 @@ func currentUserID(c *gin.Context) uint {
 	return id
 }
 
+// publicBaseURL returns the scheme://host base to build user-facing links
+// (setup / password-reset emails) so they open on the PUBLIC URL rather than a
+// hardcoded localhost default.
+//
+// When the portal runs behind a reverse proxy the proxy advertises the real
+// public origin via X-Forwarded-Proto / X-Forwarded-Host — those win, so links
+// always match the domain the user actually reached the portal on. Only when no
+// forwarded host is present (e.g. the local split dev stack where the API and
+// the Next.js frontend live on different ports) do we fall back to the
+// configured FrontendURL.
+func (s *Server) publicBaseURL(c *gin.Context) string {
+	host := firstHeaderValue(c.GetHeader("X-Forwarded-Host"))
+	if host != "" {
+		scheme := firstHeaderValue(c.GetHeader("X-Forwarded-Proto"))
+		if scheme == "" {
+			if c.Request.TLS != nil {
+				scheme = "https"
+			} else {
+				scheme = "http"
+			}
+		}
+		return strings.TrimRight(scheme+"://"+host, "/")
+	}
+	return strings.TrimRight(s.Cfg.FrontendURL, "/")
+}
+
+// firstHeaderValue returns the first, trimmed entry of a possibly
+// comma-separated proxy header (e.g. "public.example.com, internal:8080").
+func firstHeaderValue(v string) string {
+	if i := strings.IndexByte(v, ','); i >= 0 {
+		v = v[:i]
+	}
+	return strings.TrimSpace(v)
+}
+
 // CORSMiddleware sets up cross-origin resource sharing headers.
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {

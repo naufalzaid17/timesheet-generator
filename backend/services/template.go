@@ -125,7 +125,10 @@ type GenerationInput struct {
 // fixed 31-row block are trimmed to the correct length.
 func GenerateFromTemplate(in GenerationInput) ([]byte, error) {
 	// Built-in templates with a fixed layout use a dedicated strict-typed path.
-	if in.Template.Builtin == "bni_dev" {
+	switch in.Template.Builtin {
+	case "mii":
+		return generateMII(in)
+	case "bni_dev":
 		return generateBNI(in)
 	}
 
@@ -201,6 +204,185 @@ func GenerateFromTemplate(in GenerationInput) ([]byte, error) {
 			if err := f.SetCellValue(sheet, cell, value); err != nil {
 				return nil, fmt.Errorf("set daily cell %s: %w", cell, err)
 			}
+		}
+	}
+
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// MII layout hardcoded metadata. These are fixed by the client and written on
+// every worked day of the MII template.
+const (
+	miiProjectName = "BNI Direct"
+	miiProjectID   = "P24015"
+	miiDivision    = "Wholesale Digital Delivery"
+	miiDepartment  = "Wholesale Channel and Service Delivery"
+)
+
+// MIIAppImpactedOptions are the only accepted values for the MII "Aplikasi
+// Terdampak" (application impacted) column.
+var MIIAppImpactedOptions = []string{"Bisnis", "Cash", "Overseas"}
+
+// NormalizeMIIAppImpacted maps a user-entered value to its canonical MII option
+// (case-insensitively). It returns the canonical string when it matches one of
+// the allowed options, otherwise the trimmed input is returned unchanged so no
+// data is silently dropped.
+func NormalizeMIIAppImpacted(v string) string {
+	t := strings.TrimSpace(v)
+	for _, opt := range MIIAppImpactedOptions {
+		if strings.EqualFold(t, opt) {
+			return opt
+		}
+	}
+	return t
+}
+
+// generateMII renders the built-in "MII Timesheet" template. Its layout is
+// fixed by the client file, so cells are addressed directly with strict typing:
+//
+//	C1     project name (hardcoded "BNI Direct")
+//	C2-C6  header metadata (division/name/MII-ID/site from the profile; period)
+//	A9:A39 date (d-mmm-yy)      B9:B39/C9:C39 start/end time (h:mm)
+//	D9:D39 total hour (=C-B)    E9:J39 status matrix (E=P F=S G=BT H=PM I=V J=X)
+//	K      activity/remark      N       aplikasi terdampak (Bisnis/Cash/Overseas)
+//	L/M    project name/id (hardcoded)  P/Q  divisi/departement (hardcoded)
+//	O/R    AIP fitur / sub-departement (left blank)
+//	A43    employee signature (reviewer/approver blocks are left for hand-sign)
+//
+// Rows beyond the month's length are cleared so the COUNTIF totals stay correct.
+func generateMII(in GenerationInput) ([]byte, error) {
+	f, err := excelize.OpenReader(bytes.NewReader(in.Template.FileData))
+	if err != nil {
+		return nil, fmt.Errorf("open template: %w", err)
+	}
+	defer f.Close()
+
+	sheet := in.Template.SheetName
+	if sheet == "" {
+		sheet = f.GetSheetName(0)
+	}
+
+	// setTyped writes a value while preserving the cell's existing number format.
+	setTyped := func(cell string, v interface{}) {
+		style, _ := f.GetCellStyle(sheet, cell)
+		_ = f.SetCellValue(sheet, cell, v)
+		_ = f.SetCellStyle(sheet, cell, cell, style)
+	}
+	setStr := func(cell, v string) { _ = f.SetCellValue(sheet, cell, v) }
+	setFormula := func(cell, formula string) {
+		style, _ := f.GetCellStyle(sheet, cell)
+		_ = f.SetCellFormula(sheet, cell, formula)
+		_ = f.SetCellStyle(sheet, cell, cell, style)
+	}
+
+	// --- Header metadata (column C), keeping the leading ": " prefix. ---
+	setTyped("C1", ": "+miiProjectName)
+	if in.User.Division != "" {
+		setTyped("C2", ": "+in.User.Division)
+	}
+	if in.User.Name != "" {
+		setTyped("C3", ": "+in.User.Name)
+	}
+	if in.User.MiiID != "" {
+		setTyped("C4", ": "+in.User.MiiID)
+	}
+	if in.User.Site != "" {
+		setTyped("C5", ": "+in.User.Site)
+	}
+	setTyped("C6", time.Date(in.Year, time.Month(in.Month), 1, 0, 0, 0, 0, time.UTC))
+
+	// --- Employee signature block (merged A43:C46). ---
+	if in.User.Name != "" {
+		setTyped("A43", "( "+in.User.Name+" )")
+	}
+
+	byDay := make(map[int]models.DailyActivity, len(in.Activities))
+	for _, a := range in.Activities {
+		byDay[a.Date.Day()] = a
+	}
+	statusCol := map[string]string{"P": "E", "S": "F", "BT": "G", "PM": "H", "V": "I", "X": "J"}
+	statusMark := map[string]string{"P": "P", "S": "S", "BT": "BT", "PM": "PM", "V": "V", "X": "x"}
+	// Per-day data columns (everything except the date column A). The MII
+	// template ships every data row pre-filled with placeholder hours, so these
+	// are cleared at the start of each row before (re)writing.
+	dataCols := []string{"B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R"}
+	// All per-day columns, used to clear trimmed rows entirely.
+	allCols := append([]string{"A"}, dataCols...)
+
+	const firstRow = 9 // day 1
+	daysInMonth := GetDaysInMonth(in.Year, in.Month)
+
+	for day := 1; day <= 31; day++ {
+		rs := fmt.Sprintf("%d", firstRow+(day-1))
+
+		// Trim rows beyond the month's length.
+		if day > daysInMonth {
+			for _, col := range allCols {
+				setStr(col+rs, "")
+			}
+			continue
+		}
+
+		date := time.Date(in.Year, time.Month(in.Month), day, 0, 0, 0, 0, time.UTC)
+		setTyped("A"+rs, date)
+
+		// Clear all per-day data cells first so the template's placeholder values
+		// (it ships every row pre-filled with 8:00-17:00) never leak into
+		// weekends, holidays, or working days the user hasn't filled in.
+		for _, col := range dataCols {
+			setStr(col+rs, "")
+		}
+
+		isWeekend := date.Weekday() == time.Saturday || date.Weekday() == time.Sunday
+		holiday := in.Holidays[day]
+		act, hasAct := byDay[day]
+
+		status := ""
+		if hasAct {
+			status = strings.ToUpper(strings.TrimSpace(act.Status))
+
+			hasStart, hasEnd := false, false
+			if act.StartTime != "" {
+				if frac, ferr := parseTimeToExcelFraction(act.StartTime); ferr == nil {
+					setTyped("B"+rs, frac)
+					hasStart = true
+				}
+			}
+			if act.EndTime != "" {
+				if frac, ferr := parseTimeToExcelFraction(act.EndTime); ferr == nil {
+					setTyped("C"+rs, frac)
+					hasEnd = true
+				}
+			}
+			// Total hour = End - Start (only when both are present).
+			if hasStart && hasEnd {
+				setFormula("D"+rs, fmt.Sprintf("C%s-B%s", rs, rs))
+			}
+
+			setStr("K"+rs, act.Activity)
+			setStr("L"+rs, miiProjectName)
+			setStr("M"+rs, miiProjectID)
+			setStr("N"+rs, NormalizeMIIAppImpacted(act.AppImpacted))
+			setStr("O"+rs, "") // AIP Fitur (blank)
+			setStr("P"+rs, miiDivision)
+			setStr("Q"+rs, miiDepartment)
+			setStr("R"+rs, "") // Sub Departement (blank)
+		} else if isWeekend || holiday != "" {
+			status = "X"
+			if holiday != "" {
+				setStr("K"+rs, holiday)
+			} else {
+				setStr("K"+rs, "Weekend")
+			}
+			// (metadata columns already cleared above)
+		}
+
+		if col, ok := statusCol[status]; ok {
+			setStr(col+rs, statusMark[status])
 		}
 	}
 

@@ -34,8 +34,9 @@ type User struct {
 
 	Username string `gorm:"uniqueIndex;size:64;not null" json:"username"`
 	Email    string `gorm:"uniqueIndex;size:255;not null" json:"email"`
-	// PasswordHash is a bcrypt hash. It may be empty for passwordless
-	// (passkey-only) accounts that have not yet set an initial password.
+	// PasswordHash is an Argon2id PHC-encoded hash (legacy bcrypt hashes are
+	// still verified and upgraded on next login). It may be empty for
+	// passwordless (passkey-only) accounts that have not yet set a password.
 	PasswordHash string `gorm:"size:255" json:"-"`
 	Role         Role   `gorm:"size:16;not null;default:user" json:"role"`
 	IsActive     bool   `gorm:"not null;default:true" json:"is_active"`
@@ -148,6 +149,12 @@ const (
 	FieldProjectName MappingFieldType = "project_name"
 	FieldProjectID   MappingFieldType = "project_id"
 	FieldAppImpacted MappingFieldType = "app_impacted"
+	// Additional per-day columns used by the MII layout.
+	FieldTotalHour  MappingFieldType = "total_hour" // End - Start (computed)
+	FieldDivision   MappingFieldType = "division"   // per-day divisi column
+	FieldDepartment MappingFieldType = "department" // per-day departement column
+	FieldSubDept    MappingFieldType = "sub_department"
+	FieldAIPFitur   MappingFieldType = "aip_fitur"
 	// Static header/metadata single cells.
 	FieldMetaName     MappingFieldType = "meta_name"
 	FieldMetaMiiID    MappingFieldType = "meta_mii_id"
