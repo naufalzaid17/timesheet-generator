@@ -36,3 +36,44 @@
   background-color: #FF6B6B;
   border: 3px solid #000000;
 }
+
+/* ---------------------------------------------------------------------------
+   Handsontable — Neobrutalism theme overrides for the daily activity grid
+   --------------------------------------------------------------------------- */
+.ht-theme-main {
+  --ht-font-family: 'Space Grotesk', sans-serif;
+  --ht-line-height: 1.3;
+  --ht-foreground-color: #000000;
+  --ht-cell-editor-border-color: #A833B9;
+  --ht-cell-selection-border-color: #A833B9;
+  --ht-cell-selection-background-color: rgba(168, 51, 185, 0.12);
+  --ht-cell-autofill-border-color: #A833B9;
+  --ht-cell-autofill-size: 8px;
+}
+
+/* Bold, uppercase column headers to match the Neobrutalist heading style */
+.ht-theme-main th {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 11px;
+}
+
+.ht-theme-main td {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* Weekend rows: gray + muted, matching the previous disabled look */
+.ht-theme-main td.ht-weekend {
+  background-color: #e5e7eb !important;
+  color: #6b7280 !important;
+}
+
+/* Public-holiday rows: soft red tint */
+.ht-theme-main td.ht-holiday {
+  background-color: #fee2e2 !important;
+  color: #b91c1c !important;
+}

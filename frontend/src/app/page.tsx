@@ -1,14 +1,24 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Download, RefreshCw } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Download, RefreshCw, Clock } from "lucide-react";
 
 import { Header } from "../components/Header";
 import { MetadataForm } from "../components/MetadataForm";
-import { DailyGrid } from "../components/DailyGrid";
 import { StatusMessage } from "../components/StatusMessage";
 import { Footer } from "../components/Footer";
 import { DailyEntryInput } from "../types";
+
+// Handsontable touches the DOM on load, so the grid is client-only (no SSR).
+const DailyGrid = dynamic(() => import("../components/DailyGrid").then(m => m.DailyGrid), {
+  ssr: false,
+  loading: () => (
+    <div className="bg-white border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] mb-8 flex items-center gap-3 font-black uppercase">
+      <Clock className="w-6 h-6 animate-spin text-neoPink" /> Loading daily activity grid…
+    </div>
+  ),
+});
 
 export default function Home() {
   // Form states
@@ -241,34 +251,13 @@ export default function Home() {
     })));
   };
 
-  // Update a single field in a day's entry
-  const handleUpdateEntry = (day: number, field: keyof DailyEntryInput, value: any) => {
-    setDailyEntries(prev => prev.map(entry => {
-      if (entry.day === day) {
-        return {
-          ...entry,
-          [field]: value
-        };
-      }
-      return entry;
-    }));
-  };
-
-  // Helper to force 24-hour time format input (HH:mm)
-  const handleTimeChange = (day: number, field: "startTime" | "endTime", val: string) => {
-    let clean = val.replace(/[^0-9:]/g, "");
-    
-    const prevVal = dailyEntries.find(e => e.day === day)?.[field] || "";
-    
-    if (clean.length === 2 && prevVal.length < 2 && !clean.includes(":")) {
-      clean = clean + ":";
-    }
-    
-    if (clean.length > 5) {
-      clean = clean.substring(0, 5);
-    }
-    
-    handleUpdateEntry(day, field, clean);
+  // Apply a partial set of fields to one or many days at once
+  // (single-cell edits, bulk multi-select edits, and grid sync all flow through here).
+  const handleBulkUpdate = (days: number[], updates: Partial<DailyEntryInput>) => {
+    const daySet = new Set(days);
+    setDailyEntries(prev => prev.map(entry =>
+      daySet.has(entry.day) ? { ...entry, ...updates } : entry
+    ));
   };
 
   // Form submission handler
@@ -398,8 +387,7 @@ export default function Home() {
         month={month}
         holidays={holidays}
         handleClearAll={handleClearAll}
-        handleUpdateEntry={handleUpdateEntry}
-        handleTimeChange={handleTimeChange}
+        handleBulkUpdate={handleBulkUpdate}
       />
 
       <StatusMessage error={error} success={success} />
