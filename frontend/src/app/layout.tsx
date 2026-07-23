@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth";
+import { ToastProvider } from "@/components/Toast";
+import { ThemeProvider, themeInitScript } from "@/lib/theme";
 
 export const metadata: Metadata = {
-  title: "BRUTAL TIMESHEET | Automate Your Timesheets",
-  description: "Automate your monthly BNI timesheets into Excel or PDF format in seconds. Clean, fast, and structured.",
+  title: "Maman Racing — Timesheet Portal",
+  description: "Internal portal for daily timesheet entry, dynamic templates, and reminders.",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -13,8 +17,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* Apply the persisted/system theme before paint to avoid a flash. */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-screen">
-        {children}
+        <ThemeProvider>
+          <AuthProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

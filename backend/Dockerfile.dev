@@ -1,19 +1,17 @@
-FROM golang:1.21-alpine
+FROM golang:1.25-alpine
 
-# Install git (required for swag) and swag CLI
-RUN apk update && apk add --no-cache git
-RUN go install github.com/swaggo/swag/cmd/swag@latest
+# git for module fetches, tzdata so Asia/Jakarta (WIB) resolves for the cron.
+RUN apk update && apk add --no-cache git tzdata
 
-# Install Air for Go hot-reloading
-RUN go install github.com/cosmtrek/air@latest
+# Air for Go hot-reloading (air-verse is the maintained module path).
+RUN go install github.com/air-verse/air@latest
 
 WORKDIR /app
 
-# Copy dependency files
-COPY go.mod ./
+# Copy dependency files and pre-download modules.
+COPY go.mod go.sum* ./
 RUN go mod download || true
 
 EXPOSE 8080
 
-# Run Air using the config file
 CMD ["air", "-c", ".air.toml"]

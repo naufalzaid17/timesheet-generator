@@ -13,7 +13,7 @@ import (
 )
 
 // Helper functions for pointers
-func intPtr(v int) *int { return &v }
+func intPtr(v int) *int          { return &v }
 func stringPtr(v string) *string { return &v }
 
 // parseTimeToExcelFraction parses a "hh:mm" time string to the fractional value of a day
@@ -461,8 +461,8 @@ func GenerateExcel(req *models.TimesheetRequest, holidayMap map[string]string) (
 	// 6. Readability & Print Formatting
 	// Set Page Layout: A4 Paper (PaperSize: 9) and Landscape orientation
 	err = f.SetPageLayout(sheetName, &excelize.PageLayoutOptions{
-		Size:        intPtr(9),                 // A4 paper size
-		Orientation: stringPtr("landscape"),    // Landscape orientation
+		Size:        intPtr(9),              // A4 paper size
+		Orientation: stringPtr("landscape"), // Landscape orientation
 	})
 	if err != nil {
 		log.Printf("Warning: Failed to set page layout: %v", err)

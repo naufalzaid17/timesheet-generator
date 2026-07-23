@@ -34,3 +34,6 @@ next-env.d.ts
 scratch/
 sshpass.py
 *.sh
+# Keep these scripts tracked despite the blanket *.sh ignore above.
+!deploy_and_commit.sh
+!docker/aio-entrypoint.sh

@@ -6,6 +6,39 @@ Fill in your daily activities, status, and reporting metadata directly in the fr
 
 ---
 
+## 🆕 Phase 2 — Full Portal (RBAC · Passkeys · Dynamic Templates · Push)
+
+Phase 2 turns the generator into a full internal portal. See
+[`ARCHITECTURE.md`](./ARCHITECTURE.md) for the complete blueprint and API surface.
+
+- **Auth & RBAC**: Username/email + password **and** WebAuthn passkeys; `admin`
+  and `user` roles; every route protected by JWT + role guards.
+- **Admin-only user management**: No public sign-up. Admins create accounts and
+  email setup links; forgot/reset password over SMTP; profile edits require
+  admin approval before they go live.
+- **Dynamic templates**: Admins upload `.xlsx` templates and map cells/columns
+  visually in **Handsontable** on the Template Builder; mappings are stored per
+  template in PostgreSQL.
+- **Incremental daily entry**: A friendly daily modal plus a restricted monthly
+  Handsontable grid where users edit only admin-marked fillable columns.
+- **Generation + delivery**: Data is injected into the mapped template with
+  `excelize`, excess rows trimmed to the month, streamed for download **and**
+  emailed as an attachment.
+- **Web Push reminders**: VAPID + service worker; a `robfig/cron` job pinned to
+  **17:00 WIB** nudges users who haven't filled today's timesheet.
+- **Saweria-inspired UI**: Clean flat colors, rounded corners, soft shadows,
+  friendly micro-interactions (replacing the Phase 1 Neobrutalism look).
+
+**Local stack** (`docker compose up --build`): PostgreSQL, pgAdmin (`:5050`),
+Mailpit (`:8025`), Go API (`:8080`), Next.js (`:3000`). On first boot the
+bootstrap admin (`admin`) is created with a **random password printed to the
+backend logs** — grab it from `docker compose logs backend` and change it after
+signing in, or set `BOOTSTRAP_ADMIN_PASSWORD` to choose your own. In production
+(`GIN_MODE=release`) the API refuses to start unless a strong `JWT_SECRET` is
+set.
+
+---
+
 ## 🚀 Key Features
 
 ### Frontend UI (Next.js)
